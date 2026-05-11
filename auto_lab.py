@@ -55,7 +55,7 @@ def inject_lab_weight_ghost(lab_data=None):
             bis_page.on("dialog", lambda dialog: dialog.accept())
 
             # =======================================================
-            # 🚨 MAGIC 2: STRICT SEQUENTIAL FLOW 
+            # 🚨 MAGIC 2: SMART SEQUENTIAL FLOW (Check Before Type)
             # =======================================================
             def human_type_and_save(selector_id, value, save_btn_index, step_name):
                 val_str = str(value).strip()
@@ -63,26 +63,44 @@ def inject_lab_weight_ghost(lab_data=None):
                     try:
                         box = bis_page.locator(selector_id).first
                         if box.count() > 0:
+                            # 🧠 SMART CHECK: Pehle check karo ki box mein kya likha hai?
+                            current_val = str(box.evaluate("node => node.value")).strip()
+                            
+                            # "350" aur "350.0" ko ek barabar manne ka logic
+                            is_match = False
+                            try:
+                                if float(current_val) == float(val_str):
+                                    is_match = True
+                            except ValueError:
+                                if current_val == val_str:
+                                    is_match = True
+
+                            # Agar wajan pehle se sahi hai, toh time bachao aur Skip karo!
+                            if is_match:
+                                print(f"⏩ SMART SKIP: {step_name} pehle se '{current_val}' bhara hai! ⚡")
+                                return # Seedha bahar nikal jayega, Save click ka wait time bachega!
+
+                            # Agar wajan alag hai ya khali hai, toh hi type aur Save karega
                             print(f"⏳ Typing {step_name}: {val_str}")
                             box.evaluate("node => { node.removeAttribute('disabled'); node.removeAttribute('readonly'); }")
                             box.clear()
                             
-                            # 🚨 FIX: wait_for_timeout ka use kiya taaki Pop-ups catch ho sakein
+                            bis_page.wait_for_timeout(random.randint(100, 200)) # Thoda fast kiya
+                            box.type(val_str, delay=random.randint(50, 100))    # Typing speed fast ki
                             bis_page.wait_for_timeout(random.randint(200, 400))
-                            box.type(val_str, delay=random.randint(80, 150))
-                            bis_page.wait_for_timeout(random.randint(400, 600))
                             
                             save_btns = bis_page.locator("button:has-text('Save')")
                             if save_btns.count() > save_btn_index:
-                                # force=True lagaya taaki click 100% ho
                                 save_btns.nth(save_btn_index).click(force=True) 
                                 print(f"✅ Clicked Save for {step_name}")
-                                # Server processing ka wait
-                                bis_page.wait_for_timeout(random.randint(2000, 2500)) 
+                                # Naya data save hone par thoda wait karna zaroori hai taaki BIS error na de
+                                bis_page.wait_for_timeout(random.randint(1500, 2000)) 
+                        else:
+                            print(f"❌ ERROR: {step_name} ka box HTML mein nahi mila!")
                     except Exception as e:
                         print(f"⚠️ {step_name} Error: {e}")
 
-           # 🛑 STEP 1: Sample Weight (Exact ID from site)
+            # 🛑 STEP 1: Sample Weight
             human_type_and_save("#num_scrap_weight", sample_wt, 0, "Sample Weight")
 
             # 🛑 STEP 2: Button Weight
