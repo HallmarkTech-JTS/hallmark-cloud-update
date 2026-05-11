@@ -1,20 +1,26 @@
 from playwright.sync_api import sync_playwright
+import time
+import random
 
 CDP_URL = "http://localhost:9222"
 
 # ==============================================================
-# 1. LAB INJECTION (FIRE ASSAYING)
+# 1. LAB INJECTION (HUMAN-LIKE & AUTO-SAVE)
 # ==============================================================
 def inject_lab_weight_ghost(lab_data=None):
     if not lab_data: return "⚠️ इंस्ट्रक्शन: कृपया पहले Excel या Database से डेटा लोड करें!"
     excel_job_card = lab_data.pop("excel_job_card", "UNKNOWN")
+    
+    # DB se aane wale naye variables
+    sample_wt = lab_data.pop("sample_drawn_wt", None)
+    button_wt = lab_data.pop("button_wt", None)
+
     if len(lab_data) == 0: return "⚠️ इंस्ट्रक्शन: इंजेक्ट करने के लिए डेटा नहीं मिला!"
 
     print(f"👻 Lab Smart Injection Started (JC: {excel_job_card})...")
     try:
         with sync_playwright() as p:
             try: 
-                # ⏱️ TIMER 1: Sirf 3 second wait karega (Hang hone se bachayega)
                 browser = p.chromium.connect_over_cdp(CDP_URL, timeout=3000)
             except: 
                 return "⚠️ सिक्योर ब्राउज़र ओपन नहीं है!"
@@ -22,12 +28,7 @@ def inject_lab_weight_ghost(lab_data=None):
             if len(browser.contexts) == 0: 
                 return "⚠️ ब्राउज़र में कोई टैब ओपन नहीं है!"
 
-            # ⏱️ TIMER 2: Page element dhoondhne ke liye bhi sirf 3 second dega
             browser.contexts[0].set_default_timeout(3000)
-
-            # =======================================================
-            # 🎯 NAYA STRICT MATCHING LOGIC (Real HTML IDs Ke Sath)
-            # =======================================================
             bis_page = None
             
             for page in browser.contexts[0].pages:
@@ -35,7 +36,6 @@ def inject_lab_weight_ghost(lab_data=None):
                     if excel_job_card != "UNKNOWN":
                         try:
                             site_job_card = ""
-                            # HTML ke asli ID se exact Job Card nikalna (100% accurate)
                             if page.locator("#selectedjobcard").count() > 0:
                                 site_job_card = page.locator("#selectedjobcard").inner_text().strip()
                             elif page.locator("#str_job_no").count() > 0:
@@ -43,10 +43,8 @@ def inject_lab_weight_ghost(lab_data=None):
 
                             if excel_job_card in site_job_card:
                                 bis_page = page
-                                break # Sahi page mil gaya
-                        except Exception as e:
-                            print(f"Tab check error: {e}")
-                            continue 
+                                break 
+                        except: continue 
                     else:
                         bis_page = page
                         break
@@ -54,12 +52,44 @@ def inject_lab_weight_ghost(lab_data=None):
             if not bis_page:
                 try: browser.disconnect() 
                 except: pass
-                if excel_job_card != "UNKNOWN":
-                    return f"❌ अलर्ट: DB में Job Card '{excel_job_card}' है, पर साइट पर मैच नहीं हुआ! कृपया सही पेज खोलें।"
-                else:
-                    return "⚠️ Lab का पेज ओपन नहीं है!"
-            # =======================================================
+                return f"❌ अलर्ट: Job Card '{excel_job_card}' साइट पर मैच नहीं हुआ!"
 
+            # =======================================================
+            # 🚨 MAGIC 1: POP-UP AUTO HANDLER (Bot alert accept karega)
+            # =======================================================
+            bis_page.on("dialog", lambda dialog: dialog.accept())
+
+            # =======================================================
+            # 🚨 MAGIC 2: SAMPLE & BUTTON WEIGHT AUTO-FILL & SAVE
+            # =======================================================
+            def human_type_and_save(selector_id, value, btn_index):
+                if value and str(value) not in ["", "0", "None"]:
+                    try:
+                        box = bis_page.locator(selector_id)
+                        if box.count() > 0:
+                            box = box.first
+                            # Value clear karke Insaan ki tarah type karega
+                            box.evaluate("node => { node.removeAttribute('disabled'); node.removeAttribute('readonly'); }")
+                            box.clear()
+                            time.sleep(random.uniform(0.2, 0.5))
+                            box.type(str(value).strip(), delay=random.randint(100, 200)) # Human delay
+                            time.sleep(random.uniform(0.3, 0.6))
+                            
+                            # Same section ke 'Save' button par click karega
+                            save_btns = bis_page.locator("button:has-text('Save')")
+                            if save_btns.count() > btn_index:
+                                save_btns.nth(btn_index).click()
+                                time.sleep(random.uniform(0.8, 1.2)) # Pop-up ka wait
+                    except Exception as e:
+                        print(f"Weight Error ({selector_id}): {e}")
+
+            # ID select kar rahe hain (Image inspection ke hisaab se)
+            human_type_and_save("input[id*='sample']", sample_wt, 0) # 0 matlab pehla Save button
+            human_type_and_save("#buttonweight", button_wt, 1)       # 1 matlab dusra Save button
+
+            # =======================================================
+            # 🚨 MAGIC 3: TABLE M1/M2 INJECTION (HUMAN TYPING)
+            # =======================================================
             filled_count = 0
             global_phase = 1
             first_strip_name = list(lab_data.keys())[0] 
@@ -76,13 +106,17 @@ def inject_lab_weight_ghost(lab_data=None):
                     row = bis_page.locator("tr").filter(has=bis_page.get_by_text(strip_name, exact=True))
                     if row.count() > 0:
                         inputs = row.locator("input")
+                        
+                        # Insaan banne ke liye fill() ko type() me badla
                         def force_fill(idx, val):
                             if inputs.count() > idx and val:
                                 box = inputs.nth(idx)
                                 val_str = str(val).strip()
                                 if str(box.evaluate("node => node.value")).strip() != val_str:
                                     box.evaluate("node => { node.removeAttribute('disabled'); node.removeAttribute('readonly'); }")
-                                    box.fill(val_str)
+                                    box.clear()
+                                    time.sleep(random.uniform(0.1, 0.3))
+                                    box.type(val_str, delay=random.randint(80, 150)) # Human typing
                                     box.evaluate("node => node.dispatchEvent(new Event('input', { bubbles: true }))")
                                     box.evaluate("node => node.dispatchEvent(new Event('change', { bubbles: true }))")
                                     return True
@@ -99,6 +133,6 @@ def inject_lab_weight_ghost(lab_data=None):
 
             try: browser.disconnect() 
             except: pass
-            return f"✅ SUCCESS: {filled_count} Rows Injected!"
+            return f"✅ SUCCESS: {filled_count} Rows & Main Weights Injected!"
     except Exception as e: 
         return f"⚠️ Error: {e}"
