@@ -82,8 +82,8 @@ def inject_lab_weight_ghost(lab_data=None):
                     except Exception as e:
                         print(f"⚠️ {step_name} Error: {e}")
 
-            # 🛑 STEP 1: Sample Weight
-            human_type_and_save("#sampledrawnweight, input[name*='sampledrawn' i]", sample_wt, 0, "Sample Weight")
+           # 🛑 STEP 1: Sample Weight (Exact ID from site)
+            human_type_and_save("#num_scrap_weight", sample_wt, 0, "Sample Weight")
 
             # 🛑 STEP 2: Button Weight
             human_type_and_save("#buttonweight", button_wt, 1, "Button Weight")
