@@ -217,7 +217,7 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
     except Exception as e: return f"⚠️ Error: {e}"
 
 # ==============================================================
-# 4. DATA SCRAPING HELPERS
+# 4. DATA SCRAPING HELPERS 
 # ==============================================================
 def extract_id_from_page(browser):
     js_code = """
@@ -230,19 +230,21 @@ def extract_id_from_page(browser):
         return null;
     }
     """
-    for page in browser.contexts[0].pages:
-        for frame in [page] + page.frames:
-            try:
-                res = frame.evaluate(js_code)
-                if res: return res
-            except: pass
-    return None
+    for context in browser.contexts:
+        for page in context.pages:
+            for frame in [page] + page.frames:
+                try:
+                    res = frame.evaluate(js_code)
+                    if res: return res
+                except: pass
+    return {"type": "Manual Scrape", "id": "Scraped_Job"}
+
 
 # ==============================================================
 # 5. MASTER SCRAPING (100% Robust Multi Job-Cards Fetch)
 # ==============================================================
-# DHYAN RAHE: Yahan @eel.expose NAHI lagana hai
-def fast_scrape_huid():
+# 🚨 NAYA FIX: Is function ka naam wahi rakha hai jo aapki main.py file dhoondh rahi hai
+def smart_scrape_with_huid():
     print("🚀 MASTER SCRAPER TRIGGERED!")
     try:
         from playwright.sync_api import sync_playwright
@@ -256,17 +258,15 @@ def fast_scrape_huid():
             list_page = None
             
             # =======================================================
-            # 🚀 STEP 1: DETECT MASTER PAGE ROBUSTLY (Button Dekh Kar)
+            # 🚀 STEP 1: Detect Page across ALL contexts
             # =======================================================
             print(f"🔍 Total Contexts Found: {len(browser.contexts)}")
             for context in browser.contexts:
                 for page in context.pages:
                     try:
-                        # Sirf URL nahi, actual button dhoondho!
                         if page.locator("a:has-text('QM Job Card View')").count() > 0:
                             list_page = page
                             break
-                        # Frame ke andar bhi check karo
                         for frame in page.frames:
                             if frame.locator("a:has-text('QM Job Card View')").count() > 0:
                                 list_page = frame
@@ -278,7 +278,7 @@ def fast_scrape_huid():
             if list_page:
                 print("🎯 Master Table Page Detected Successfully!")
                 
-                # Javascipt se Request No. aur Job Cards ek sath nikal lete hain (Safe from timeouts)
+                # Javascipt se Request No. aur Job Cards nikalna (Safe from timeouts)
                 js_find_jobs = """
                 () => {
                     let rows = document.querySelectorAll('tr');
@@ -324,7 +324,6 @@ def fast_scrape_huid():
                         row_locator = list_page.locator(f"tr:has-text('{jc_no}')").first
                         action_link = row_locator.locator("a:has-text('QM Job Card View')").first
                         
-                        # Fix: Naya tab list_page wale context me hi khulna chahiye
                         browser_context = list_page.context if hasattr(list_page, 'context') else list_page.page.context
                         
                         with browser_context.expect_page(timeout=15000) as new_page_info:
@@ -332,7 +331,7 @@ def fast_scrape_huid():
                         
                         new_page = new_page_info.value
                         new_page.wait_for_load_state("networkidle")
-                        time.sleep(2) # Extra wait for inner table to render
+                        time.sleep(2) 
                         
                         js_scrape_inner = """
                         () => {
@@ -387,7 +386,7 @@ def fast_scrape_huid():
                             print(f"⚠️ Data not found in {jc_no} tab")
                             
                         new_page.close()
-                        time.sleep(1) # Small delay before clicking next
+                        time.sleep(1) 
                         
                     except Exception as e:
                         print(f"⚠️ Error processing {jc_no}: {e}")
