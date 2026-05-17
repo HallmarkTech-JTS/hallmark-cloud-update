@@ -242,15 +242,16 @@ def extract_id_from_page(browser):
 
 
 # ==============================================================
-# 5. MASTER SCRAPING (Multi-Request Interactive Popup)
+# 5. MASTER SCRAPING (Premium Scrollable Popup & Multi-Request)
 # ==============================================================
 def smart_scrape_with_huid():
-    print("🚀 MASTER SCRAPER WITH POPUP TRIGGERED!")
+    print("🚀 MASTER SCRAPER WITH PREMIUM POPUP TRIGGERED!")
     try:
         from playwright.sync_api import sync_playwright
         import time
         import eel
-        import tkinter as tk  # 🚀 NAYA IMPORT POPUP KE LIYE
+        import tkinter as tk
+        from tkinter import ttk  # Scrollbar ke liye
         
         with sync_playwright() as p:
             try: browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
@@ -307,7 +308,7 @@ def smart_scrape_with_huid():
                 print(f"📌 Found {len(unique_reqs)} Unique Requests.")
                 
                 # =======================================================
-                # 🚀 STEP 3: SHOW WINDOWS POPUP FOR SELECTION
+                # 🚀 STEP 3: SHOW PREMIUM WINDOWS POPUP (Scroll + Select All)
                 # =======================================================
                 selected_requests = []
                 
@@ -315,28 +316,72 @@ def smart_scrape_with_huid():
                     root = tk.Tk()
                     root.title("SELECT REQUESTS")
                     root.attributes('-topmost', True)
-                    root.configure(padx=20, pady=20, bg="#f8fafc")
+                    root.configure(bg="#f8fafc")
                     
-                    tk.Label(root, text="Tick Requests to Fetch Data:", font=("Arial", 12, "bold"), bg="#f8fafc", fg="#0f172a").pack(pady=(0,15))
+                    # Fix Window Size
+                    window_width = 380
+                    window_height = 450
+                    x = (root.winfo_screenwidth() // 2) - (window_width // 2)
+                    y = (root.winfo_screenheight() // 2) - (window_height // 2)
+                    root.geometry(f"{window_width}x{window_height}+{x}+{y}")
+                    root.resizable(False, False) # Resize lock taaki design na bigde
                     
+                    # Title
+                    tk.Label(root, text="Select Requests to Fetch:", font=("Arial", 12, "bold"), bg="#f8fafc", fg="#0f172a").pack(pady=(15, 5))
+                    
+                    # Vars dictionary to track checkboxes
                     vars_dict = {}
+                    
+                    # --- Select All / Deselect All Buttons ---
+                    btn_frame = tk.Frame(root, bg="#f8fafc")
+                    btn_frame.pack(fill="x", padx=20, pady=5)
+                    
+                    def select_all():
+                        for v in vars_dict.values(): v.set(True)
+                    def deselect_all():
+                        for v in vars_dict.values(): v.set(False)
+                        
+                    tk.Button(btn_frame, text="☑ Select All", command=select_all, bg="#e2e8f0", fg="#334155", font=("Arial", 9, "bold"), relief="flat", cursor="hand2").pack(side="left", expand=True, fill="x", padx=(0, 5))
+                    tk.Button(btn_frame, text="☐ Deselect All", command=deselect_all, bg="#e2e8f0", fg="#334155", font=("Arial", 9, "bold"), relief="flat", cursor="hand2").pack(side="right", expand=True, fill="x", padx=(5, 0))
+                    
+                    # --- Scrollable List Area ---
+                    list_container = tk.Frame(root, bg="white", highlightbackground="#cbd5e1", highlightthickness=1)
+                    list_container.pack(fill="both", expand=True, padx=20, pady=10)
+                    
+                    canvas = tk.Canvas(list_container, bg="white", highlightthickness=0)
+                    scrollbar = ttk.Scrollbar(list_container, orient="vertical", command=canvas.yview)
+                    scrollable_frame = tk.Frame(canvas, bg="white")
+                    
+                    scrollable_frame.bind(
+                        "<Configure>",
+                        lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+                    )
+                    
+                    canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+                    canvas.configure(yscrollcommand=scrollbar.set)
+                    
+                    canvas.pack(side="left", fill="both", expand=True)
+                    scrollbar.pack(side="right", fill="y")
+                    
+                    # Mouse wheel scrolling enable
+                    def _on_mousewheel(event):
+                        canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+                    canvas.bind_all("<MouseWheel>", _on_mousewheel)
+                    
+                    # Populate checkboxes
                     for req in unique_reqs:
                         var = tk.BooleanVar(value=True) # By default sab par tick
                         vars_dict[req] = var
-                        tk.Checkbutton(root, text=f"Request No:  {req}", variable=var, font=("Arial", 11), bg="#f8fafc", fg="#334155").pack(anchor="w", pady=3)
+                        tk.Checkbutton(scrollable_frame, text=f"  Request No:  {req}", variable=var, font=("Arial", 11), bg="white", fg="#334155", activebackground="white", cursor="hand2").pack(anchor="w", padx=10, pady=6)
                         
+                    # --- Submit Button ---
                     def on_submit():
                         for r, v in vars_dict.items():
                             if v.get(): selected_requests.append(r)
+                        canvas.unbind_all("<MouseWheel>") # Clean up
                         root.destroy()
                         
-                    tk.Button(root, text="🚀 FETCH SELECTED DATA", command=on_submit, bg="#10b981", fg="white", font=("Arial", 11, "bold"), pady=8).pack(pady=(20,0), fill="x")
-                    
-                    # Center the popup window
-                    root.update_idletasks()
-                    x = (root.winfo_screenwidth() // 2) - (root.winfo_width() // 2)
-                    y = (root.winfo_screenheight() // 2) - (root.winfo_height() // 2)
-                    root.geometry(f"+{x}+{y}")
+                    tk.Button(root, text="🚀 FETCH SELECTED DATA", command=on_submit, bg="#10b981", activebackground="#059669", fg="white", activeforeground="white", font=("Arial", 11, "bold"), relief="flat", cursor="hand2", pady=8).pack(fill="x", padx=20, pady=(0, 20))
                     
                     root.mainloop()
 
