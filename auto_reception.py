@@ -1,4 +1,5 @@
 from playwright.sync_api import sync_playwright
+import concurrent.futures  # 🚀 NAYA IMPORT ERROR FIX KE LIYE
 import time
 import re
 import eel  
@@ -84,6 +85,7 @@ def inject_single_reception_tag(job_id, tag_id, weight):
             else: return {"status": "error", "msg": f"⚠️ Tag '{tag_id}' Editable list me nahi mila."}
     except Exception as e: return {"status": "error", "msg": f"⚠️ Error: {str(e)}"}
 
+
 # ==============================================================
 # 2. FAST DROPDOWN INJECTION 
 # ==============================================================
@@ -143,6 +145,7 @@ def fast_inject_weight(job_id, tag_id, weight):
             else: return {"status": "error", "msg": f"⚠️ Tag '{tag_id}' list me nahi mila."}
     except Exception as e: return {"status": "error", "msg": f"⚠️ Error: {str(e)}"}
 
+
 # ==============================================================
 # 3. FULL AUTO INJECTION (Poori list ek sath)
 # ==============================================================
@@ -152,7 +155,7 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
     try:
         with sync_playwright() as p:
             try: browser = p.chromium.connect_over_cdp(CDP_URL)
-            except: return "⚠️ ब्राउज़र ओपन नहीं है!"
+            except: return "⚠️ ब्राउज़र ओपन नहीं hai!"
 
             job_matched = False
             for page in browser.contexts[0].pages:
@@ -217,6 +220,7 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
             return f"✅ Success! {filled_count} Tags Save kar diye gaye."
     except Exception as e: return f"⚠️ Error: {e}"
 
+
 # ==============================================================
 # 4. DATA SCRAPING HELPERS
 # ==============================================================
@@ -242,10 +246,9 @@ def extract_id_from_page(browser):
 
 
 # ==============================================================
-# 5. MASTER SCRAPING (Turbo Speed + Sorted Grouping Popup)
+# 5. MASTER SCRAPING (Thread-Safe, Turbo Speed + Popup)
 # ==============================================================
-def smart_scrape_with_huid():
-    print("🚀 TURBO SCRAPER WITH GROUPED POPUP TRIGGERED!")
+def _smart_scrape_thread_task():
     try:
         from playwright.sync_api import sync_playwright
         import time
@@ -300,10 +303,9 @@ def smart_scrape_with_huid():
                 if not master_info or len(master_info) == 0:
                     return {"status": "error", "msg": "⚠️ Table mein Request No. nahi mila!"}
                 
-                # 🚀 Sort Requests & Job Cards inside them into perfect series!
+                # Sort Requests & Job Cards inside them into perfect series!
                 unique_reqs = sorted(list(master_info.keys()))
                 for req in unique_reqs:
-                    # Remove duplicates if any, and sort job cards in ascending order
                     master_info[req] = sorted(list(set(master_info[req])))
                 
                 print(f"📌 Perfectly Sorted {len(unique_reqs)} Unique Requests.")
@@ -316,7 +318,6 @@ def smart_scrape_with_huid():
                     root.attributes('-topmost', True)
                     root.configure(bg="#f8fafc")
                     
-                    # Popup Thoda bada kiya taaki data perfectly dikhe
                     window_width = 420
                     window_height = 500
                     x = (root.winfo_screenwidth() // 2) - (window_width // 2)
@@ -355,17 +356,16 @@ def smart_scrape_with_huid():
                         canvas.yview_scroll(int(-1*(event.delta/120)), "units")
                     canvas.bind_all("<MouseWheel>", _on_mousewheel)
                     
-                    # 🚀 NAYA: Grouped View UI
+                    # 🚀 Grouped View UI
                     for req in unique_reqs:
                         var = tk.BooleanVar(value=True)
                         vars_dict[req] = var
                         
                         jobs_list = master_info[req]
                         jobs_str = ", ".join(jobs_list)
-                        if len(jobs_str) > 55: jobs_str = jobs_str[:52] + "..." # Truncate agar list bohot lambi ho
+                        if len(jobs_str) > 55: jobs_str = jobs_str[:52] + "..."
                         
                         display_text = f"📋 Request: {req}  ({len(jobs_list)} Jobs)\n     ↳ {jobs_str}"
-                        
                         tk.Checkbutton(scrollable_frame, text=display_text, variable=var, font=("Arial", 10), bg="white", fg="#0f172a", activebackground="white", cursor="hand2", justify="left").pack(anchor="w", padx=10, pady=8)
                         
                     def on_submit():
@@ -385,10 +385,9 @@ def smart_scrape_with_huid():
                 # 🚀 STEP 4: Perfectly Ordered Series Job Cards List
                 job_cards_to_process = []
                 for req in selected_requests:
-                    job_cards_to_process.extend(master_info[req]) # Yeh data pehle se hi sorted hai!
+                    job_cards_to_process.extend(master_info[req]) 
                     
                 print(f"📦 Fully Arranged Job Cards to Process: {job_cards_to_process}")
-                
                 all_jobs_data = []
 
                 # =======================================================
@@ -406,9 +405,7 @@ def smart_scrape_with_huid():
                             action_link.click(force=True)
                         
                         new_page = new_page_info.value
-                        
-                        # Turbo Wait
-                        new_page.wait_for_load_state("domcontentloaded")
+                        new_page.wait_for_load_state("domcontentloaded") # Turbo Wait
                         
                         js_scrape_inner = """
                         () => {
@@ -580,6 +577,15 @@ def smart_scrape_with_huid():
             
     except Exception as e: return {"status": "error", "msg": f"Script Error: {str(e)}"}
 
+# 🚀 NAYA: Thread wrapper jo Playwright ko Event Loop se alag karta hai
+def smart_scrape_with_huid():
+    print("🚀 THREAD-SAFE MASTER SCRAPER CALLED!")
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(_smart_scrape_thread_task)
+            return future.result()
+    except Exception as e:
+        return {"status": "error", "msg": f"Thread Error: {str(e)}"}
 
 # ==============================================================
 # 6. WAIT FOR JOB CARD NO
