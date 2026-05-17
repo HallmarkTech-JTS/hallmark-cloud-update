@@ -247,30 +247,32 @@ def extract_id_from_page(browser):
 def smart_scrape_with_huid():
     print("🚀 MASTER SCRAPER WITH POPUP TRIGGERED!")
     try:
+        from playwright.sync_api import sync_playwright
+        import time
+        import eel
+        import tkinter as tk  # 🚀 NAYA IMPORT POPUP KE LIYE
+        
         with sync_playwright() as p:
             try: browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
             except: return {"status": "error", "msg": "⚠️ Secure BIS Browser connect nahi ho paya!"}
             
             list_page = None
             
-            # 🚀 STEP 1: Detect Master Page
-            print(f"🔍 Total Contexts Found: {len(browser.contexts)}")
+            # 🚀 STEP 1: Find Master Table Frame
             for context in browser.contexts:
                 for page in context.pages:
-                    try:
-                        if page.locator("a:has-text('QM Job Card View')").count() > 0:
-                            list_page = page; break
-                        for frame in page.frames:
+                    for frame in [page] + page.frames:
+                        try:
                             if frame.locator("a:has-text('QM Job Card View')").count() > 0:
                                 list_page = frame; break
-                    except: pass
+                        except: pass
                     if list_page: break
                 if list_page: break
             
             if list_page:
                 print("🎯 Master Table Detected! Parsing Data...")
                 
-                # 🚀 STEP 2: Extract ALL Unique Requests and Jobs using JS
+                # 🚀 STEP 2: Extract ALL Unique Requests and Jobs
                 js_find_jobs = """
                 () => {
                     let rows = document.querySelectorAll('tr');
@@ -304,7 +306,9 @@ def smart_scrape_with_huid():
                 
                 print(f"📌 Found {len(unique_reqs)} Unique Requests.")
                 
-                # 🚀 STEP 3: SHOW NATIVE WINDOWS POPUP FOR SELECTION
+                # =======================================================
+                # 🚀 STEP 3: SHOW WINDOWS POPUP FOR SELECTION
+                # =======================================================
                 selected_requests = []
                 
                 def show_popup():
@@ -313,35 +317,31 @@ def smart_scrape_with_huid():
                     root.attributes('-topmost', True)
                     root.configure(padx=20, pady=20, bg="#f8fafc")
                     
-                    # Window position center mein
-                    window_width = 350
-                    window_height = 100 + (len(unique_reqs) * 30)
-                    screen_width = root.winfo_screenwidth()
-                    screen_height = root.winfo_screenheight()
-                    x = int((screen_width/2) - (window_width/2))
-                    y = int((screen_height/2) - (window_height/2))
-                    root.geometry(f"{window_width}x{window_height}+{x}+{y}")
-                    
                     tk.Label(root, text="Tick Requests to Fetch Data:", font=("Arial", 12, "bold"), bg="#f8fafc", fg="#0f172a").pack(pady=(0,15))
                     
                     vars_dict = {}
                     for req in unique_reqs:
-                        var = tk.BooleanVar(value=True) # By default sab par tick rahega
+                        var = tk.BooleanVar(value=True) # By default sab par tick
                         vars_dict[req] = var
-                        tk.Checkbutton(root, text=f"Request No:  {req}", variable=var, font=("Arial", 11), bg="#f8fafc", fg="#334155", selectcolor="#e2e8f0").pack(anchor="w", pady=3)
+                        tk.Checkbutton(root, text=f"Request No:  {req}", variable=var, font=("Arial", 11), bg="#f8fafc", fg="#334155").pack(anchor="w", pady=3)
                         
                     def on_submit():
-                        for req, var in vars_dict.items():
-                            if var.get(): selected_requests.append(req)
-                        root.quit()
+                        for r, v in vars_dict.items():
+                            if v.get(): selected_requests.append(r)
                         root.destroy()
                         
                     tk.Button(root, text="🚀 FETCH SELECTED DATA", command=on_submit, bg="#10b981", fg="white", font=("Arial", 11, "bold"), pady=8).pack(pady=(20,0), fill="x")
+                    
+                    # Center the popup window
+                    root.update_idletasks()
+                    x = (root.winfo_screenwidth() // 2) - (root.winfo_width() // 2)
+                    y = (root.winfo_screenheight() // 2) - (root.winfo_height() // 2)
+                    root.geometry(f"+{x}+{y}")
+                    
                     root.mainloop()
 
                 show_popup() # Call Popup
                 
-                # Agar user ne kuch select nahi kiya ya popup close kar diya
                 if not selected_requests:
                     return {"status": "error", "msg": "⚠️ Aapne koi Request No. select nahi kiya!"}
                 
@@ -536,111 +536,3 @@ def smart_scrape_with_huid():
             return {"status": "success", "items": all_scraped_items, "extracted_info": extracted_info}
             
     except Exception as e: return {"status": "error", "msg": f"Script Error: {str(e)}"}
-
-# ==============================================================
-# 6. WAIT FOR JOB CARD NO
-# ==============================================================
-def wait_for_job_card_no():
-    print("👻 Waiting for Job Card Generation...")
-    try:
-        with sync_playwright() as p:
-            browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
-            job_card_no = None
-            for _ in range(45): 
-                for page in browser.contexts[0].pages:
-                    for frame in [page] + page.frames:
-                        try:
-                            text = frame.locator("body").inner_text()
-                            if "Job Card Created" in text:
-                                match = re.search(r"Job Card Created\s*[:\-]?\s*(\d{8,})", text, re.IGNORECASE)
-                                if match: job_card_no = match.group(1); break
-                        except: pass
-                    if job_card_no: break
-                if job_card_no: break
-                time.sleep(1)
-            try: browser.disconnect()
-            except: pass
-            if not job_card_no: return {"status": "error", "msg": "⚠️ Time out!"}
-            return {"status": "success", "job_card": job_card_no}
-    except Exception as e: return {"status": "error", "msg": str(e)}
-
-# ==============================================================
-# 7. AUTO GENERATE REQUEST & JOB CARDS (Master Automation)
-# ==============================================================
-def auto_generate_request_and_jobs(jeweller_code, state, items_list):
-    print("🚀 Master Automation Started: Request -> Job Cards")
-    try:
-        with sync_playwright() as p:
-            try: 
-                browser = p.chromium.connect_over_cdp(CDP_URL)
-                page = browser.contexts[0].pages[0] 
-            except: 
-                return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
-
-            page.locator("text=Create Hallmarking Request").first.click()
-            page.locator("text=PROCESSING").wait_for(state="hidden")
-
-            page.locator("span:has-text('Select State')").first.click()
-            page.locator("input[role='textbox']").fill(state)
-            page.keyboard.press("Enter")
-
-            page.locator("span:has-text('Select Jeweller Name')").first.click()
-            page.locator("input[role='textbox']").fill(jeweller_code)
-            time.sleep(1) 
-            page.keyboard.press("Enter")
-
-            for item in items_list:
-                page.locator("text=Add Items").first.click()
-                page.locator("span:has-text('Enter category')").first.click()
-                page.keyboard.type(item['category'])
-                page.keyboard.press("Enter")
-                page.locator("input[placeholder='Enter quantity']").fill(str(item['quantity']))
-                page.locator("input[placeholder='Enter weight']").fill(str(item['weight']))
-                page.locator("button:has-text('Save')").first.click()
-                page.locator("text=PROCESSING").wait_for(state="hidden")
-
-            page.locator("button:has-text('Submit to AHC')").first.click()
-            page.locator("text=PROCESSING").wait_for(state="hidden")
-
-            req_text = page.locator("h4:has-text('Request Number is :')").inner_text()
-            request_number = req_text.split(":")[-1].strip()
-
-            page.locator("text=Home Page").first.click()
-            page.locator("text=PROCESSING").wait_for(state="hidden")
-            page.locator("div:has-text('New request')").nth(1).click()
-            page.locator("text=PROCESSING").wait_for(state="hidden")
-
-            row = page.locator(f"tr:has-text('{request_number}')")
-            row.locator("a[title='Action']").first.click()
-            page.locator("text=PROCESSING").wait_for(state="hidden")
-
-            page.locator("input[type='radio'][value='Yes']").first.check()
-            rows = page.locator("table tbody tr").all()
-            for index, tr in enumerate(rows):
-                if index < len(items_list):
-                    item = items_list[index]
-                    tr.locator("input[title='Observed Item Category Weight(Gms)']").fill(str(item['weight']))
-                    cat_prefix = item['category'][:2].lower() 
-                    tags = "\n".join([f"{cat_prefix}{i+1}" for i in range(int(item['quantity']))])
-                    tr.locator("input[title='Tag Id (AHC)']").fill(tags)
-                    tr.locator("input[type='checkbox']").first.check()
-
-            page.locator("input[placeholder='Enter AHC Receiving remarks']").fill("ok")
-            page.once("dialog", lambda dialog: dialog.accept()) 
-            page.locator("button:has-text('Submit')").first.click()
-            page.locator("text=PROCESSING").wait_for(state="hidden")
-
-            job_card_text = page.locator("h4:has-text('Job Card Created')").inner_text()
-            job_cards = [x.strip() for x in job_card_text.split("Created")[-1].split(",") if x.strip()]
-            
-            try: browser.disconnect()
-            except: pass
-
-            return {
-                "status": "success", 
-                "request_number": request_number, 
-                "job_cards": job_cards
-            }
-
-    except Exception as e: 
-        return {"status": "error", "msg": f"⚠️ Error: {str(e)}"}
