@@ -84,7 +84,6 @@ def inject_single_reception_tag(job_id, tag_id, weight):
             else: return {"status": "error", "msg": f"⚠️ Tag '{tag_id}' Editable list me nahi mila."}
     except Exception as e: return {"status": "error", "msg": f"⚠️ Error: {str(e)}"}
 
-
 # ==============================================================
 # 2. FAST DROPDOWN INJECTION 
 # ==============================================================
@@ -143,7 +142,6 @@ def fast_inject_weight(job_id, tag_id, weight):
                 else: return {"status": "error", "msg": "⚠️ Input box nahi mila!"}
             else: return {"status": "error", "msg": f"⚠️ Tag '{tag_id}' list me nahi mila."}
     except Exception as e: return {"status": "error", "msg": f"⚠️ Error: {str(e)}"}
-
 
 # ==============================================================
 # 3. FULL AUTO INJECTION (Poori list ek sath)
@@ -219,7 +217,6 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
             return f"✅ Success! {filled_count} Tags Save kar diye gaye."
     except Exception as e: return f"⚠️ Error: {e}"
 
-
 # ==============================================================
 # 4. DATA SCRAPING HELPERS
 # ==============================================================
@@ -245,10 +242,10 @@ def extract_id_from_page(browser):
 
 
 # ==============================================================
-# 5. MASTER SCRAPING (Turbo Speed + Premium Popup + No ttk)
+# 5. MASTER SCRAPING (Turbo Speed + Sorted Grouping Popup)
 # ==============================================================
 def smart_scrape_with_huid():
-    print("🚀 TURBO SCRAPER WITH PREMIUM POPUP TRIGGERED!")
+    print("🚀 TURBO SCRAPER WITH GROUPED POPUP TRIGGERED!")
     try:
         from playwright.sync_api import sync_playwright
         import time
@@ -273,13 +270,13 @@ def smart_scrape_with_huid():
                 if list_page: break
             
             if list_page:
-                print("🎯 Master Table Detected! Parsing Data Fast...")
+                print("🎯 Master Table Detected! Sorting Data...")
                 
+                # 🚀 STEP 2: Extract & Group Jobs logically by Request No
                 js_find_jobs = """
                 () => {
                     let rows = document.querySelectorAll('tr');
-                    let uniqueReqs = [];
-                    let allData = [];
+                    let reqMap = {};
                     for(let r of rows) {
                         let cells = r.querySelectorAll('td');
                         if(cells.length > 5) {
@@ -287,24 +284,29 @@ def smart_scrape_with_huid():
                             let jobNo = cells[4].innerText.trim();
                             let actionBtn = r.querySelector('a');
                             if (actionBtn && actionBtn.innerText.includes('QM Job Card View')) {
-                                if (reqNo && !uniqueReqs.includes(reqNo)) {
-                                    uniqueReqs.push(reqNo);
+                                if (reqNo && jobNo) {
+                                    if(!reqMap[reqNo]) reqMap[reqNo] = [];
+                                    reqMap[reqNo].push(jobNo);
                                 }
-                                allData.push({req: reqNo, job: jobNo});
                             }
                         }
                     }
-                    return { uniqueReqs: uniqueReqs, allData: allData };
+                    return reqMap;
                 }
                 """
                 
                 master_info = list_page.evaluate(js_find_jobs)
                 
-                if not master_info or not master_info.get("uniqueReqs"):
+                if not master_info or len(master_info) == 0:
                     return {"status": "error", "msg": "⚠️ Table mein Request No. nahi mila!"}
-                    
-                unique_reqs = master_info["uniqueReqs"]
-                all_data = master_info["allData"]
+                
+                # 🚀 Sort Requests & Job Cards inside them into perfect series!
+                unique_reqs = sorted(list(master_info.keys()))
+                for req in unique_reqs:
+                    # Remove duplicates if any, and sort job cards in ascending order
+                    master_info[req] = sorted(list(set(master_info[req])))
+                
+                print(f"📌 Perfectly Sorted {len(unique_reqs)} Unique Requests.")
                 
                 selected_requests = []
                 
@@ -314,8 +316,9 @@ def smart_scrape_with_huid():
                     root.attributes('-topmost', True)
                     root.configure(bg="#f8fafc")
                     
-                    window_width = 380
-                    window_height = 450
+                    # Popup Thoda bada kiya taaki data perfectly dikhe
+                    window_width = 420
+                    window_height = 500
                     x = (root.winfo_screenwidth() // 2) - (window_width // 2)
                     y = (root.winfo_screenheight() // 2) - (window_height // 2)
                     root.geometry(f"{window_width}x{window_height}+{x}+{y}")
@@ -352,10 +355,18 @@ def smart_scrape_with_huid():
                         canvas.yview_scroll(int(-1*(event.delta/120)), "units")
                     canvas.bind_all("<MouseWheel>", _on_mousewheel)
                     
+                    # 🚀 NAYA: Grouped View UI
                     for req in unique_reqs:
                         var = tk.BooleanVar(value=True)
                         vars_dict[req] = var
-                        tk.Checkbutton(scrollable_frame, text=f"  Request No:  {req}", variable=var, font=("Arial", 11), bg="white", fg="#334155", activebackground="white", cursor="hand2").pack(anchor="w", padx=10, pady=6)
+                        
+                        jobs_list = master_info[req]
+                        jobs_str = ", ".join(jobs_list)
+                        if len(jobs_str) > 55: jobs_str = jobs_str[:52] + "..." # Truncate agar list bohot lambi ho
+                        
+                        display_text = f"📋 Request: {req}  ({len(jobs_list)} Jobs)\n     ↳ {jobs_str}"
+                        
+                        tk.Checkbutton(scrollable_frame, text=display_text, variable=var, font=("Arial", 10), bg="white", fg="#0f172a", activebackground="white", cursor="hand2", justify="left").pack(anchor="w", padx=10, pady=8)
                         
                     def on_submit():
                         for r, v in vars_dict.items():
@@ -371,13 +382,17 @@ def smart_scrape_with_huid():
                 if not selected_requests:
                     return {"status": "error", "msg": "⚠️ Aapne koi Request No. select nahi kiya!"}
                 
-                job_cards_to_process = [d['job'] for d in all_data if d['req'] in selected_requests]
-                print(f"📦 Selected Job Cards to Process: {job_cards_to_process}")
+                # 🚀 STEP 4: Perfectly Ordered Series Job Cards List
+                job_cards_to_process = []
+                for req in selected_requests:
+                    job_cards_to_process.extend(master_info[req]) # Yeh data pehle se hi sorted hai!
+                    
+                print(f"📦 Fully Arranged Job Cards to Process: {job_cards_to_process}")
                 
                 all_jobs_data = []
 
                 # =======================================================
-                # ⚡ STEP 5: TURBO SPEED SCRAPING LOOP
+                # ⚡ STEP 5: TURBO SPEED SCRAPING LOOP (Sorted)
                 # =======================================================
                 for jc_no in job_cards_to_process:
                     print(f"⚡ Turbo Fetching: {jc_no}...")
@@ -392,7 +407,7 @@ def smart_scrape_with_huid():
                         
                         new_page = new_page_info.value
                         
-                        # Turbo: Wait only for DOM (Fast)
+                        # Turbo Wait
                         new_page.wait_for_load_state("domcontentloaded")
                         
                         js_scrape_inner = """
