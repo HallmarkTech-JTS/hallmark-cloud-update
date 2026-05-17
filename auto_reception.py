@@ -2,8 +2,8 @@ from playwright.sync_api import sync_playwright
 import time
 import re
 import eel  
-import tkinter as tk  # 🚀 NAYA IMPORT POPUP KE LIYE
 
+# Playwright ke liye local browser ka URL
 CDP_URL = "http://localhost:9222"
 
 # ==============================================================
@@ -84,6 +84,7 @@ def inject_single_reception_tag(job_id, tag_id, weight):
             else: return {"status": "error", "msg": f"⚠️ Tag '{tag_id}' Editable list me nahi mila."}
     except Exception as e: return {"status": "error", "msg": f"⚠️ Error: {str(e)}"}
 
+
 # ==============================================================
 # 2. FAST DROPDOWN INJECTION 
 # ==============================================================
@@ -142,6 +143,7 @@ def fast_inject_weight(job_id, tag_id, weight):
                 else: return {"status": "error", "msg": "⚠️ Input box nahi mila!"}
             else: return {"status": "error", "msg": f"⚠️ Tag '{tag_id}' list me nahi mila."}
     except Exception as e: return {"status": "error", "msg": f"⚠️ Error: {str(e)}"}
+
 
 # ==============================================================
 # 3. FULL AUTO INJECTION (Poori list ek sath)
@@ -217,6 +219,7 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
             return f"✅ Success! {filled_count} Tags Save kar diye gaye."
     except Exception as e: return f"⚠️ Error: {e}"
 
+
 # ==============================================================
 # 4. DATA SCRAPING HELPERS
 # ==============================================================
@@ -242,16 +245,15 @@ def extract_id_from_page(browser):
 
 
 # ==============================================================
-# 5. MASTER SCRAPING (Premium Scrollable Popup - NO TTK FIX)
+# 5. MASTER SCRAPING (Turbo Speed + Premium Popup + No ttk)
 # ==============================================================
 def smart_scrape_with_huid():
-    print("🚀 MASTER SCRAPER WITH PREMIUM POPUP TRIGGERED!")
+    print("🚀 TURBO SCRAPER WITH PREMIUM POPUP TRIGGERED!")
     try:
         from playwright.sync_api import sync_playwright
         import time
         import eel
         import tkinter as tk
-        # 🚨 FIX: ttk import hata diya gaya hai taaki .exe crash na ho
         
         with sync_playwright() as p:
             try: browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
@@ -271,9 +273,8 @@ def smart_scrape_with_huid():
                 if list_page: break
             
             if list_page:
-                print("🎯 Master Table Detected! Parsing Data...")
+                print("🎯 Master Table Detected! Parsing Data Fast...")
                 
-                # 🚀 STEP 2: Extract ALL Unique Requests and Jobs
                 js_find_jobs = """
                 () => {
                     let rows = document.querySelectorAll('tr');
@@ -305,11 +306,6 @@ def smart_scrape_with_huid():
                 unique_reqs = master_info["uniqueReqs"]
                 all_data = master_info["allData"]
                 
-                print(f"📌 Found {len(unique_reqs)} Unique Requests.")
-                
-                # =======================================================
-                # 🚀 STEP 3: SHOW WINDOWS POPUP (Scroll + Select All)
-                # =======================================================
                 selected_requests = []
                 
                 def show_popup():
@@ -318,7 +314,6 @@ def smart_scrape_with_huid():
                     root.attributes('-topmost', True)
                     root.configure(bg="#f8fafc")
                     
-                    # Fix Window Size
                     window_width = 380
                     window_height = 450
                     x = (root.winfo_screenwidth() // 2) - (window_width // 2)
@@ -326,13 +321,9 @@ def smart_scrape_with_huid():
                     root.geometry(f"{window_width}x{window_height}+{x}+{y}")
                     root.resizable(False, False) 
                     
-                    # Title
                     tk.Label(root, text="Select Requests to Fetch:", font=("Arial", 12, "bold"), bg="#f8fafc", fg="#0f172a").pack(pady=(15, 5))
-                    
-                    # Vars dictionary
                     vars_dict = {}
                     
-                    # --- Select / Deselect All Buttons ---
                     btn_frame = tk.Frame(root, bg="#f8fafc")
                     btn_frame.pack(fill="x", padx=20, pady=5)
                     
@@ -344,23 +335,16 @@ def smart_scrape_with_huid():
                     tk.Button(btn_frame, text="☑ Select All", command=select_all, bg="#e2e8f0", fg="#334155", font=("Arial", 9, "bold"), relief="flat", cursor="hand2").pack(side="left", expand=True, fill="x", padx=(0, 5))
                     tk.Button(btn_frame, text="☐ Deselect All", command=deselect_all, bg="#e2e8f0", fg="#334155", font=("Arial", 9, "bold"), relief="flat", cursor="hand2").pack(side="right", expand=True, fill="x", padx=(5, 0))
                     
-                    # --- Scrollable List Area (USING STANDARD TKINTER NOW) ---
                     list_container = tk.Frame(root, bg="white", highlightbackground="#cbd5e1", highlightthickness=1)
                     list_container.pack(fill="both", expand=True, padx=20, pady=10)
                     
                     canvas = tk.Canvas(list_container, bg="white", highlightthickness=0)
-                    # 🚨 FIX: ttk.Scrollbar ki jagah tk.Scrollbar
                     scrollbar = tk.Scrollbar(list_container, orient="vertical", command=canvas.yview)
                     scrollable_frame = tk.Frame(canvas, bg="white")
                     
-                    scrollable_frame.bind(
-                        "<Configure>",
-                        lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-                    )
-                    
+                    scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
                     canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
                     canvas.configure(yscrollcommand=scrollbar.set)
-                    
                     canvas.pack(side="left", fill="both", expand=True)
                     scrollbar.pack(side="right", fill="y")
                     
@@ -368,21 +352,18 @@ def smart_scrape_with_huid():
                         canvas.yview_scroll(int(-1*(event.delta/120)), "units")
                     canvas.bind_all("<MouseWheel>", _on_mousewheel)
                     
-                    # Populate checkboxes
                     for req in unique_reqs:
                         var = tk.BooleanVar(value=True)
                         vars_dict[req] = var
                         tk.Checkbutton(scrollable_frame, text=f"  Request No:  {req}", variable=var, font=("Arial", 11), bg="white", fg="#334155", activebackground="white", cursor="hand2").pack(anchor="w", padx=10, pady=6)
                         
-                    # --- Submit Button ---
                     def on_submit():
                         for r, v in vars_dict.items():
                             if v.get(): selected_requests.append(r)
                         canvas.unbind_all("<MouseWheel>")
                         root.destroy()
                         
-                    tk.Button(root, text="🚀 FETCH SELECTED DATA", command=on_submit, bg="#10b981", activebackground="#059669", fg="white", activeforeground="white", font=("Arial", 11, "bold"), relief="flat", cursor="hand2", pady=8).pack(fill="x", padx=20, pady=(0, 20))
-                    
+                    tk.Button(root, text="⚡ START FAST FETCH", command=on_submit, bg="#10b981", activebackground="#059669", fg="white", activeforeground="white", font=("Arial", 11, "bold"), relief="flat", cursor="hand2", pady=8).pack(fill="x", padx=20, pady=(0, 20))
                     root.mainloop()
 
                 show_popup() 
@@ -395,20 +376,24 @@ def smart_scrape_with_huid():
                 
                 all_jobs_data = []
 
+                # =======================================================
+                # ⚡ STEP 5: TURBO SPEED SCRAPING LOOP
+                # =======================================================
                 for jc_no in job_cards_to_process:
-                    print(f"⏳ Opening Job Card: {jc_no}...")
+                    print(f"⚡ Turbo Fetching: {jc_no}...")
                     try:
                         row_locator = list_page.locator(f"tr:has-text('{jc_no}')").first
                         action_link = row_locator.locator("a:has-text('QM Job Card View')").first
                         
                         browser_context = list_page.context if hasattr(list_page, 'context') else list_page.page.context
                         
-                        with browser_context.expect_page(timeout=15000) as new_page_info:
+                        with browser_context.expect_page(timeout=10000) as new_page_info:
                             action_link.click(force=True)
                         
                         new_page = new_page_info.value
-                        new_page.wait_for_load_state("networkidle")
-                        time.sleep(2) 
+                        
+                        # Turbo: Wait only for DOM (Fast)
+                        new_page.wait_for_load_state("domcontentloaded")
                         
                         js_scrape_inner = """
                         () => {
@@ -450,20 +435,24 @@ def smart_scrape_with_huid():
                         """
                         
                         items = None
-                        for f in [new_page] + new_page.frames:
-                            try:
-                                res = f.evaluate(js_scrape_inner)
-                                if res: items = res; break
-                            except: pass
+                        
+                        # Turbo: Micro-polling
+                        for _ in range(15):  
+                            for f in [new_page] + new_page.frames:
+                                try:
+                                    res = f.evaluate(js_scrape_inner)
+                                    if res: items = res; break
+                                except: pass
+                            if items: break
+                            time.sleep(0.2)  
                         
                         if items: 
                             all_jobs_data.append({"job_card": jc_no, "items": items})
-                            print(f"✅ Extracted {len(items)} items from {jc_no}")
+                            print(f"✅ Instant Grab: {len(items)} items from {jc_no}")
                         else:
                             print(f"⚠️ Data not found in {jc_no} tab")
                             
                         new_page.close()
-                        time.sleep(1) 
                         
                     except Exception as e:
                         print(f"⚠️ Error processing {jc_no}: {e}")
@@ -476,7 +465,6 @@ def smart_scrape_with_huid():
                                 j_data = all_jobs_data[idx]
                                 info = {"type": "Job Card", "id": j_data["job_card"]}
                                 save_func(j_data["items"], info)
-                                print(f"💾 Job {j_data['job_card']} secretly saved to DB!")
                     except Exception as e:
                         print("Silent DB Save Error:", e)
 
@@ -494,8 +482,6 @@ def smart_scrape_with_huid():
             # =======================================================
             # 🛡️ FALLBACK: SINGLE SCRAPING
             # =======================================================
-            print("⚠️ Master page detect nahi hua! Fallback to normal scrape...")
-            
             extracted_info = extract_id_from_page(browser)
             js_code_single = """
             () => {
@@ -578,3 +564,113 @@ def smart_scrape_with_huid():
             return {"status": "success", "items": all_scraped_items, "extracted_info": extracted_info}
             
     except Exception as e: return {"status": "error", "msg": f"Script Error: {str(e)}"}
+
+
+# ==============================================================
+# 6. WAIT FOR JOB CARD NO
+# ==============================================================
+def wait_for_job_card_no():
+    print("👻 Waiting for Job Card Generation...")
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
+            job_card_no = None
+            for _ in range(45): 
+                for page in browser.contexts[0].pages:
+                    for frame in [page] + page.frames:
+                        try:
+                            text = frame.locator("body").inner_text()
+                            if "Job Card Created" in text:
+                                match = re.search(r"Job Card Created\s*[:\-]?\s*(\d{8,})", text, re.IGNORECASE)
+                                if match: job_card_no = match.group(1); break
+                        except: pass
+                    if job_card_no: break
+                if job_card_no: break
+                time.sleep(1)
+            try: browser.disconnect()
+            except: pass
+            if not job_card_no: return {"status": "error", "msg": "⚠️ Time out!"}
+            return {"status": "success", "job_card": job_card_no}
+    except Exception as e: return {"status": "error", "msg": str(e)}
+
+
+# ==============================================================
+# 7. AUTO GENERATE REQUEST & JOB CARDS (Master Automation)
+# ==============================================================
+def auto_generate_request_and_jobs(jeweller_code, state, items_list):
+    print("🚀 Master Automation Started: Request -> Job Cards")
+    try:
+        with sync_playwright() as p:
+            try: 
+                browser = p.chromium.connect_over_cdp(CDP_URL)
+                page = browser.contexts[0].pages[0] 
+            except: 
+                return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
+
+            page.locator("text=Create Hallmarking Request").first.click()
+            page.locator("text=PROCESSING").wait_for(state="hidden")
+
+            page.locator("span:has-text('Select State')").first.click()
+            page.locator("input[role='textbox']").fill(state)
+            page.keyboard.press("Enter")
+
+            page.locator("span:has-text('Select Jeweller Name')").first.click()
+            page.locator("input[role='textbox']").fill(jeweller_code)
+            time.sleep(1) 
+            page.keyboard.press("Enter")
+
+            for item in items_list:
+                page.locator("text=Add Items").first.click()
+                page.locator("span:has-text('Enter category')").first.click()
+                page.keyboard.type(item['category'])
+                page.keyboard.press("Enter")
+                page.locator("input[placeholder='Enter quantity']").fill(str(item['quantity']))
+                page.locator("input[placeholder='Enter weight']").fill(str(item['weight']))
+                page.locator("button:has-text('Save')").first.click()
+                page.locator("text=PROCESSING").wait_for(state="hidden")
+
+            page.locator("button:has-text('Submit to AHC')").first.click()
+            page.locator("text=PROCESSING").wait_for(state="hidden")
+
+            req_text = page.locator("h4:has-text('Request Number is :')").inner_text()
+            request_number = req_text.split(":")[-1].strip()
+
+            page.locator("text=Home Page").first.click()
+            page.locator("text=PROCESSING").wait_for(state="hidden")
+            page.locator("div:has-text('New request')").nth(1).click()
+            page.locator("text=PROCESSING").wait_for(state="hidden")
+
+            row = page.locator(f"tr:has-text('{request_number}')")
+            row.locator("a[title='Action']").first.click()
+            page.locator("text=PROCESSING").wait_for(state="hidden")
+
+            page.locator("input[type='radio'][value='Yes']").first.check()
+            rows = page.locator("table tbody tr").all()
+            for index, tr in enumerate(rows):
+                if index < len(items_list):
+                    item = items_list[index]
+                    tr.locator("input[title='Observed Item Category Weight(Gms)']").fill(str(item['weight']))
+                    cat_prefix = item['category'][:2].lower() 
+                    tags = "\n".join([f"{cat_prefix}{i+1}" for i in range(int(item['quantity']))])
+                    tr.locator("input[title='Tag Id (AHC)']").fill(tags)
+                    tr.locator("input[type='checkbox']").first.check()
+
+            page.locator("input[placeholder='Enter AHC Receiving remarks']").fill("ok")
+            page.once("dialog", lambda dialog: dialog.accept()) 
+            page.locator("button:has-text('Submit')").first.click()
+            page.locator("text=PROCESSING").wait_for(state="hidden")
+
+            job_card_text = page.locator("h4:has-text('Job Card Created')").inner_text()
+            job_cards = [x.strip() for x in job_card_text.split("Created")[-1].split(",") if x.strip()]
+            
+            try: browser.disconnect()
+            except: pass
+
+            return {
+                "status": "success", 
+                "request_number": request_number, 
+                "job_cards": job_cards
+            }
+
+    except Exception as e: 
+        return {"status": "error", "msg": f"⚠️ Error: {str(e)}"}
