@@ -2,6 +2,7 @@ from playwright.sync_api import sync_playwright
 import time
 import re
 import eel  
+import tkinter as tk  # 🚀 NAYA IMPORT POPUP KE LIYE
 
 CDP_URL = "http://localhost:9222"
 
@@ -217,7 +218,7 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
     except Exception as e: return f"⚠️ Error: {e}"
 
 # ==============================================================
-# 4. DATA SCRAPING HELPERS 
+# 4. DATA SCRAPING HELPERS
 # ==============================================================
 def extract_id_from_page(browser):
     js_code = """
@@ -241,49 +242,40 @@ def extract_id_from_page(browser):
 
 
 # ==============================================================
-# 5. MASTER SCRAPING (100% Robust Multi Job-Cards Fetch)
+# 5. MASTER SCRAPING (Multi-Request Interactive Popup)
 # ==============================================================
-# 🚨 NAYA FIX: Is function ka naam wahi rakha hai jo aapki main.py file dhoondh rahi hai
 def smart_scrape_with_huid():
-    print("🚀 MASTER SCRAPER TRIGGERED!")
+    print("🚀 MASTER SCRAPER WITH POPUP TRIGGERED!")
     try:
-        from playwright.sync_api import sync_playwright
-        import time
-        import eel
-        
         with sync_playwright() as p:
             try: browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
             except: return {"status": "error", "msg": "⚠️ Secure BIS Browser connect nahi ho paya!"}
             
             list_page = None
             
-            # =======================================================
-            # 🚀 STEP 1: Detect Page across ALL contexts
-            # =======================================================
+            # 🚀 STEP 1: Detect Master Page
             print(f"🔍 Total Contexts Found: {len(browser.contexts)}")
             for context in browser.contexts:
                 for page in context.pages:
                     try:
                         if page.locator("a:has-text('QM Job Card View')").count() > 0:
-                            list_page = page
-                            break
+                            list_page = page; break
                         for frame in page.frames:
                             if frame.locator("a:has-text('QM Job Card View')").count() > 0:
-                                list_page = frame
-                                break
+                                list_page = frame; break
                     except: pass
                     if list_page: break
                 if list_page: break
             
             if list_page:
-                print("🎯 Master Table Page Detected Successfully!")
+                print("🎯 Master Table Detected! Parsing Data...")
                 
-                # Javascipt se Request No. aur Job Cards nikalna (Safe from timeouts)
+                # 🚀 STEP 2: Extract ALL Unique Requests and Jobs using JS
                 js_find_jobs = """
                 () => {
                     let rows = document.querySelectorAll('tr');
-                    let targetReq = null;
-                    let jobs = [];
+                    let uniqueReqs = [];
+                    let allData = [];
                     for(let r of rows) {
                         let cells = r.querySelectorAll('td');
                         if(cells.length > 5) {
@@ -291,33 +283,75 @@ def smart_scrape_with_huid():
                             let jobNo = cells[4].innerText.trim();
                             let actionBtn = r.querySelector('a');
                             if (actionBtn && actionBtn.innerText.includes('QM Job Card View')) {
-                                if(!targetReq && reqNo.length > 0) targetReq = reqNo;
-                                if(reqNo === targetReq) {
-                                    jobs.push(jobNo);
+                                if (reqNo && !uniqueReqs.includes(reqNo)) {
+                                    uniqueReqs.push(reqNo);
                                 }
+                                allData.push({req: reqNo, job: jobNo});
                             }
                         }
                     }
-                    return { targetReq: targetReq, jobs: jobs };
+                    return { uniqueReqs: uniqueReqs, allData: allData };
                 }
                 """
                 
                 master_info = list_page.evaluate(js_find_jobs)
                 
-                if not master_info or not master_info.get("targetReq"):
+                if not master_info or not master_info.get("uniqueReqs"):
                     return {"status": "error", "msg": "⚠️ Table mein Request No. nahi mila!"}
                     
-                target_request_no = master_info["targetReq"]
-                job_cards_to_process = master_info["jobs"]
+                unique_reqs = master_info["uniqueReqs"]
+                all_data = master_info["allData"]
                 
-                print(f"📌 Target Request No: {target_request_no}")
-                print(f"📦 Job Cards to Process: {job_cards_to_process}")
+                print(f"📌 Found {len(unique_reqs)} Unique Requests.")
+                
+                # 🚀 STEP 3: SHOW NATIVE WINDOWS POPUP FOR SELECTION
+                selected_requests = []
+                
+                def show_popup():
+                    root = tk.Tk()
+                    root.title("SELECT REQUESTS")
+                    root.attributes('-topmost', True)
+                    root.configure(padx=20, pady=20, bg="#f8fafc")
+                    
+                    # Window position center mein
+                    window_width = 350
+                    window_height = 100 + (len(unique_reqs) * 30)
+                    screen_width = root.winfo_screenwidth()
+                    screen_height = root.winfo_screenheight()
+                    x = int((screen_width/2) - (window_width/2))
+                    y = int((screen_height/2) - (window_height/2))
+                    root.geometry(f"{window_width}x{window_height}+{x}+{y}")
+                    
+                    tk.Label(root, text="Tick Requests to Fetch Data:", font=("Arial", 12, "bold"), bg="#f8fafc", fg="#0f172a").pack(pady=(0,15))
+                    
+                    vars_dict = {}
+                    for req in unique_reqs:
+                        var = tk.BooleanVar(value=True) # By default sab par tick rahega
+                        vars_dict[req] = var
+                        tk.Checkbutton(root, text=f"Request No:  {req}", variable=var, font=("Arial", 11), bg="#f8fafc", fg="#334155", selectcolor="#e2e8f0").pack(anchor="w", pady=3)
+                        
+                    def on_submit():
+                        for req, var in vars_dict.items():
+                            if var.get(): selected_requests.append(req)
+                        root.quit()
+                        root.destroy()
+                        
+                    tk.Button(root, text="🚀 FETCH SELECTED DATA", command=on_submit, bg="#10b981", fg="white", font=("Arial", 11, "bold"), pady=8).pack(pady=(20,0), fill="x")
+                    root.mainloop()
+
+                show_popup() # Call Popup
+                
+                # Agar user ne kuch select nahi kiya ya popup close kar diya
+                if not selected_requests:
+                    return {"status": "error", "msg": "⚠️ Aapne koi Request No. select nahi kiya!"}
+                
+                # 🚀 STEP 4: Filter Job Cards based on selection
+                job_cards_to_process = [d['job'] for d in all_data if d['req'] in selected_requests]
+                print(f"📦 Selected Job Cards to Process: {job_cards_to_process}")
                 
                 all_jobs_data = []
 
-                # =======================================================
-                # 🚀 STEP 3: Click and Scrape each Job Card
-                # =======================================================
+                # 🚀 STEP 5: Loop and Scrape Each Selected Job Card
                 for jc_no in job_cards_to_process:
                     print(f"⏳ Opening Job Card: {jc_no}...")
                     try:
@@ -391,9 +425,7 @@ def smart_scrape_with_huid():
                     except Exception as e:
                         print(f"⚠️ Error processing {jc_no}: {e}")
 
-                # =======================================================
-                # 🚀 STEP 4: Secret Internal DB Saving
-                # =======================================================
+                # 🚀 STEP 6: Secret Internal DB Saving
                 if len(all_jobs_data) > 0:
                     try:
                         save_func = eel._exposed_functions.get('wait_for_job_card_and_save')
@@ -415,7 +447,7 @@ def smart_scrape_with_huid():
                         "extracted_info": {"type": "Job Card", "id": first_job["job_card"]}
                     }
                 else:
-                    return {"status": "error", "msg": f"⚠️ Request {target_request_no} ke tabs se koi data nahi mila!"}
+                    return {"status": "error", "msg": "⚠️ Selected Requests ke tabs se koi data nahi mila!"}
             
             # =======================================================
             # 🛡️ FALLBACK: SINGLE SCRAPING
