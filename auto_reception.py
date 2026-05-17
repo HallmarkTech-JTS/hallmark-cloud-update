@@ -1,8 +1,10 @@
 from playwright.sync_api import sync_playwright
-import concurrent.futures  # 🚀 NAYA IMPORT ERROR FIX KE LIYE
 import time
 import re
 import eel  
+import asyncio
+import threading
+import tkinter as tk
 
 # Playwright ke liye local browser ka URL
 CDP_URL = "http://localhost:9222"
@@ -246,15 +248,11 @@ def extract_id_from_page(browser):
 
 
 # ==============================================================
-# 5. MASTER SCRAPING (Thread-Safe, Turbo Speed + Popup)
+# 5. MASTER SCRAPING ENGINE (Thread-Safe + Search + Sort)
 # ==============================================================
-def _smart_scrape_thread_task():
+
+def _smart_scrape_logic():
     try:
-        from playwright.sync_api import sync_playwright
-        import time
-        import eel
-        import tkinter as tk
-        
         with sync_playwright() as p:
             try: browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
             except: return {"status": "error", "msg": "⚠️ Secure BIS Browser connect nahi ho paya!"}
@@ -275,7 +273,6 @@ def _smart_scrape_thread_task():
             if list_page:
                 print("🎯 Master Table Detected! Sorting Data...")
                 
-                # 🚀 STEP 2: Extract & Group Jobs logically by Request No
                 js_find_jobs = """
                 () => {
                     let rows = document.querySelectorAll('tr');
@@ -303,30 +300,37 @@ def _smart_scrape_thread_task():
                 if not master_info or len(master_info) == 0:
                     return {"status": "error", "msg": "⚠️ Table mein Request No. nahi mila!"}
                 
-                # Sort Requests & Job Cards inside them into perfect series!
-                unique_reqs = sorted(list(master_info.keys()))
-                for req in unique_reqs:
-                    master_info[req] = sorted(list(set(master_info[req])))
+                # 🚀 SORTING MAGIC: Nayi Request Sabse Upar (Descending)
+                unique_reqs = sorted(list(master_info.keys()), key=lambda x: int(x) if str(x).isdigit() else 0, reverse=True)
                 
-                print(f"📌 Perfectly Sorted {len(unique_reqs)} Unique Requests.")
+                # Job Cards line se (Ascending)
+                for req in unique_reqs:
+                    master_info[req] = sorted(list(set(master_info[req])), key=lambda x: int(x) if str(x).isdigit() else 0)
                 
                 selected_requests = []
                 
+                # --- NATIVE WINDOWS POPUP WITH SEARCH ---
                 def show_popup():
                     root = tk.Tk()
                     root.title("SELECT REQUESTS")
                     root.attributes('-topmost', True)
                     root.configure(bg="#f8fafc")
                     
-                    window_width = 420
-                    window_height = 500
+                    window_width = 450
+                    window_height = 550
                     x = (root.winfo_screenwidth() // 2) - (window_width // 2)
                     y = (root.winfo_screenheight() // 2) - (window_height // 2)
                     root.geometry(f"{window_width}x{window_height}+{x}+{y}")
                     root.resizable(False, False) 
                     
-                    tk.Label(root, text="Select Requests to Fetch:", font=("Arial", 12, "bold"), bg="#f8fafc", fg="#0f172a").pack(pady=(15, 5))
+                    # 🔍 SEARCH BAR UI
+                    search_var = tk.StringVar()
+                    tk.Label(root, text="🔍 Search Request No:", bg="#f8fafc", font=("Arial", 10, "bold"), fg="#334155").pack(pady=(10,0))
+                    search_entry = tk.Entry(root, textvariable=search_var, font=("Arial", 12), relief="solid", borderwidth=1, justify="center")
+                    search_entry.pack(fill="x", padx=30, pady=(5, 10))
+                    
                     vars_dict = {}
+                    checkbuttons_dict = {} # Search logic ke liye
                     
                     btn_frame = tk.Frame(root, bg="#f8fafc")
                     btn_frame.pack(fill="x", padx=20, pady=5)
@@ -356,7 +360,8 @@ def _smart_scrape_thread_task():
                         canvas.yview_scroll(int(-1*(event.delta/120)), "units")
                     canvas.bind_all("<MouseWheel>", _on_mousewheel)
                     
-                    # 🚀 Grouped View UI
+                    # Create checkboxes with GRID (for easy searching/hiding)
+                    row_idx = 0
                     for req in unique_reqs:
                         var = tk.BooleanVar(value=True)
                         vars_dict[req] = var
@@ -365,8 +370,23 @@ def _smart_scrape_thread_task():
                         jobs_str = ", ".join(jobs_list)
                         if len(jobs_str) > 55: jobs_str = jobs_str[:52] + "..."
                         
-                        display_text = f"📋 Request: {req}  ({len(jobs_list)} Jobs)\n     ↳ {jobs_str}"
-                        tk.Checkbutton(scrollable_frame, text=display_text, variable=var, font=("Arial", 10), bg="white", fg="#0f172a", activebackground="white", cursor="hand2", justify="left").pack(anchor="w", padx=10, pady=8)
+                        display_text = f"📋 Req: {req}  ({len(jobs_list)} Jobs)\n     ↳ {jobs_str}"
+                        cb = tk.Checkbutton(scrollable_frame, text=display_text, variable=var, font=("Arial", 10), bg="white", fg="#0f172a", activebackground="white", cursor="hand2", justify="left")
+                        cb.grid(row=row_idx, column=0, sticky="w", padx=10, pady=5)
+                        
+                        checkbuttons_dict[req] = cb
+                        row_idx += 1
+                        
+                    # 🔍 LIVE SEARCH LOGIC
+                    def filter_list(*args):
+                        term = search_var.get().lower().strip()
+                        for req, cb in checkbuttons_dict.items():
+                            if term in req.lower():
+                                cb.grid() # Wapas dikhao
+                            else:
+                                cb.grid_remove() # Chhupao
+                                
+                    search_var.trace("w", filter_list)
                         
                     def on_submit():
                         for r, v in vars_dict.items():
@@ -375,6 +395,8 @@ def _smart_scrape_thread_task():
                         root.destroy()
                         
                     tk.Button(root, text="⚡ START FAST FETCH", command=on_submit, bg="#10b981", activebackground="#059669", fg="white", activeforeground="white", font=("Arial", 11, "bold"), relief="flat", cursor="hand2", pady=8).pack(fill="x", padx=20, pady=(0, 20))
+                    
+                    search_entry.focus_set() # Search bar me by default click rahega
                     root.mainloop()
 
                 show_popup() 
@@ -382,16 +404,16 @@ def _smart_scrape_thread_task():
                 if not selected_requests:
                     return {"status": "error", "msg": "⚠️ Aapne koi Request No. select nahi kiya!"}
                 
-                # 🚀 STEP 4: Perfectly Ordered Series Job Cards List
                 job_cards_to_process = []
+                # Keep them perfectly sorted exactly how we prepared them
                 for req in selected_requests:
                     job_cards_to_process.extend(master_info[req]) 
                     
-                print(f"📦 Fully Arranged Job Cards to Process: {job_cards_to_process}")
+                print(f"📦 Arranged Jobs to Fetch: {job_cards_to_process}")
                 all_jobs_data = []
 
                 # =======================================================
-                # ⚡ STEP 5: TURBO SPEED SCRAPING LOOP (Sorted)
+                # ⚡ STEP 5: TURBO SPEED SCRAPING LOOP
                 # =======================================================
                 for jc_no in job_cards_to_process:
                     print(f"⚡ Turbo Fetching: {jc_no}...")
@@ -405,7 +427,7 @@ def _smart_scrape_thread_task():
                             action_link.click(force=True)
                         
                         new_page = new_page_info.value
-                        new_page.wait_for_load_state("domcontentloaded") # Turbo Wait
+                        new_page.wait_for_load_state("domcontentloaded")
                         
                         js_scrape_inner = """
                         () => {
@@ -577,15 +599,33 @@ def _smart_scrape_thread_task():
             
     except Exception as e: return {"status": "error", "msg": f"Script Error: {str(e)}"}
 
-# 🚀 NAYA: Thread wrapper jo Playwright ko Event Loop se alag karta hai
+# ==============================================================
+# 🚀 NAYA: GUARANTEED EVENT LOOP FIX (THREADING WRAPPER)
+# ==============================================================
 def smart_scrape_with_huid():
-    print("🚀 THREAD-SAFE MASTER SCRAPER CALLED!")
-    try:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(_smart_scrape_thread_task)
-            return future.result()
-    except Exception as e:
-        return {"status": "error", "msg": f"Thread Error: {str(e)}"}
+    print("🚀 THREAD-SAFE TURBO SCRAPER CALLED!")
+    result_box = []
+    
+    def runner():
+        # Force fresh Event Loop taaki 'Already Running' ka error kabhi na aaye!
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            res = _smart_scrape_logic()
+            result_box.append(res)
+        except Exception as e:
+            result_box.append({"status": "error", "msg": f"Scraper Thread Error: {str(e)}"})
+        finally:
+            loop.close()
+            
+    # Naye kamre (Thread) me bot ko bheja
+    t = threading.Thread(target=runner)
+    t.start()
+    t.join() # UI tab tak wait karega jab tak data nahi aata
+    
+    if result_box: return result_box[0]
+    return {"status": "error", "msg": "Unknown threading error."}
+
 
 # ==============================================================
 # 6. WAIT FOR JOB CARD NO
