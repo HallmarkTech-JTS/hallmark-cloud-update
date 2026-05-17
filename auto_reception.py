@@ -242,7 +242,7 @@ def extract_id_from_page(browser):
 
 
 # ==============================================================
-# 5. MASTER SCRAPING (Premium Scrollable Popup & Multi-Request)
+# 5. MASTER SCRAPING (Premium Scrollable Popup - NO TTK FIX)
 # ==============================================================
 def smart_scrape_with_huid():
     print("🚀 MASTER SCRAPER WITH PREMIUM POPUP TRIGGERED!")
@@ -251,7 +251,7 @@ def smart_scrape_with_huid():
         import time
         import eel
         import tkinter as tk
-        from tkinter import ttk  # Scrollbar ke liye
+        # 🚨 FIX: ttk import hata diya gaya hai taaki .exe crash na ho
         
         with sync_playwright() as p:
             try: browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
@@ -308,7 +308,7 @@ def smart_scrape_with_huid():
                 print(f"📌 Found {len(unique_reqs)} Unique Requests.")
                 
                 # =======================================================
-                # 🚀 STEP 3: SHOW PREMIUM WINDOWS POPUP (Scroll + Select All)
+                # 🚀 STEP 3: SHOW WINDOWS POPUP (Scroll + Select All)
                 # =======================================================
                 selected_requests = []
                 
@@ -324,15 +324,15 @@ def smart_scrape_with_huid():
                     x = (root.winfo_screenwidth() // 2) - (window_width // 2)
                     y = (root.winfo_screenheight() // 2) - (window_height // 2)
                     root.geometry(f"{window_width}x{window_height}+{x}+{y}")
-                    root.resizable(False, False) # Resize lock taaki design na bigde
+                    root.resizable(False, False) 
                     
                     # Title
                     tk.Label(root, text="Select Requests to Fetch:", font=("Arial", 12, "bold"), bg="#f8fafc", fg="#0f172a").pack(pady=(15, 5))
                     
-                    # Vars dictionary to track checkboxes
+                    # Vars dictionary
                     vars_dict = {}
                     
-                    # --- Select All / Deselect All Buttons ---
+                    # --- Select / Deselect All Buttons ---
                     btn_frame = tk.Frame(root, bg="#f8fafc")
                     btn_frame.pack(fill="x", padx=20, pady=5)
                     
@@ -344,12 +344,13 @@ def smart_scrape_with_huid():
                     tk.Button(btn_frame, text="☑ Select All", command=select_all, bg="#e2e8f0", fg="#334155", font=("Arial", 9, "bold"), relief="flat", cursor="hand2").pack(side="left", expand=True, fill="x", padx=(0, 5))
                     tk.Button(btn_frame, text="☐ Deselect All", command=deselect_all, bg="#e2e8f0", fg="#334155", font=("Arial", 9, "bold"), relief="flat", cursor="hand2").pack(side="right", expand=True, fill="x", padx=(5, 0))
                     
-                    # --- Scrollable List Area ---
+                    # --- Scrollable List Area (USING STANDARD TKINTER NOW) ---
                     list_container = tk.Frame(root, bg="white", highlightbackground="#cbd5e1", highlightthickness=1)
                     list_container.pack(fill="both", expand=True, padx=20, pady=10)
                     
                     canvas = tk.Canvas(list_container, bg="white", highlightthickness=0)
-                    scrollbar = ttk.Scrollbar(list_container, orient="vertical", command=canvas.yview)
+                    # 🚨 FIX: ttk.Scrollbar ki jagah tk.Scrollbar
+                    scrollbar = tk.Scrollbar(list_container, orient="vertical", command=canvas.yview)
                     scrollable_frame = tk.Frame(canvas, bg="white")
                     
                     scrollable_frame.bind(
@@ -363,14 +364,13 @@ def smart_scrape_with_huid():
                     canvas.pack(side="left", fill="both", expand=True)
                     scrollbar.pack(side="right", fill="y")
                     
-                    # Mouse wheel scrolling enable
                     def _on_mousewheel(event):
                         canvas.yview_scroll(int(-1*(event.delta/120)), "units")
                     canvas.bind_all("<MouseWheel>", _on_mousewheel)
                     
                     # Populate checkboxes
                     for req in unique_reqs:
-                        var = tk.BooleanVar(value=True) # By default sab par tick
+                        var = tk.BooleanVar(value=True)
                         vars_dict[req] = var
                         tk.Checkbutton(scrollable_frame, text=f"  Request No:  {req}", variable=var, font=("Arial", 11), bg="white", fg="#334155", activebackground="white", cursor="hand2").pack(anchor="w", padx=10, pady=6)
                         
@@ -378,25 +378,23 @@ def smart_scrape_with_huid():
                     def on_submit():
                         for r, v in vars_dict.items():
                             if v.get(): selected_requests.append(r)
-                        canvas.unbind_all("<MouseWheel>") # Clean up
+                        canvas.unbind_all("<MouseWheel>")
                         root.destroy()
                         
                     tk.Button(root, text="🚀 FETCH SELECTED DATA", command=on_submit, bg="#10b981", activebackground="#059669", fg="white", activeforeground="white", font=("Arial", 11, "bold"), relief="flat", cursor="hand2", pady=8).pack(fill="x", padx=20, pady=(0, 20))
                     
                     root.mainloop()
 
-                show_popup() # Call Popup
+                show_popup() 
                 
                 if not selected_requests:
                     return {"status": "error", "msg": "⚠️ Aapne koi Request No. select nahi kiya!"}
                 
-                # 🚀 STEP 4: Filter Job Cards based on selection
                 job_cards_to_process = [d['job'] for d in all_data if d['req'] in selected_requests]
                 print(f"📦 Selected Job Cards to Process: {job_cards_to_process}")
                 
                 all_jobs_data = []
 
-                # 🚀 STEP 5: Loop and Scrape Each Selected Job Card
                 for jc_no in job_cards_to_process:
                     print(f"⏳ Opening Job Card: {jc_no}...")
                     try:
@@ -470,7 +468,6 @@ def smart_scrape_with_huid():
                     except Exception as e:
                         print(f"⚠️ Error processing {jc_no}: {e}")
 
-                # 🚀 STEP 6: Secret Internal DB Saving
                 if len(all_jobs_data) > 0:
                     try:
                         save_func = eel._exposed_functions.get('wait_for_job_card_and_save')
