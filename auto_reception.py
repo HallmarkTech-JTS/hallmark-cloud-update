@@ -5,6 +5,7 @@ import eel
 import asyncio
 import threading
 import tkinter as tk
+import random  # 🚀 NAYA IMPORT ANTI-BOT SYSTEM KE LIYE
 
 # Playwright ke liye local browser ka URL
 CDP_URL = "http://localhost:9222"
@@ -62,21 +63,23 @@ def inject_single_reception_tag(job_id, tag_id, weight):
                 weight_input = target_row.locator("input.weightCls, input.scan-input, input[name='articlWeight'], input:not([type='hidden']):not([type='checkbox'])").first
                 
                 if weight_input.count() > 0:
-                    js_inject = f"""node => {{
+                    # 🚀 ANTI-BOT: Human-like typing
+                    js_enable = """node => {
                         node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
-                        node.removeAttribute('onpaste'); node.removeAttribute('oncopy'); 
-                        node.removeAttribute('oncut'); node.removeAttribute('oncontextmenu'); 
-                        node.value = '{weight}'; 
-                        node.dispatchEvent(new Event('input', {{ bubbles: true }})); 
-                        node.dispatchEvent(new Event('change', {{ bubbles: true }})); 
-                        node.dispatchEvent(new Event('blur', {{ bubbles: true }})); 
-                    }}"""
-                    weight_input.evaluate(js_inject)
+                    }"""
+                    weight_input.evaluate(js_enable)
+                    weight_input.focus()
+                    weight_input.fill("")
+                    time.sleep(random.uniform(0.1, 0.2)) # Chota sa pause
+                    weight_input.type(weight, delay=random.randint(30, 80)) # Human typing speed
+                    
+                    weight_input.evaluate("node => { node.dispatchEvent(new Event('input', { bubbles: true })); node.dispatchEvent(new Event('change', { bubbles: true })); }")
                     
                     save_btn = target_row.locator("text='Save'").first
                     if save_btn.is_visible():
                         main_page = target_frame if hasattr(target_frame, 'once') else target_frame.page
                         main_page.once("dialog", lambda dialog: dialog.accept())
+                        time.sleep(random.uniform(0.2, 0.4)) # Button dabane se pehle pause
                         save_btn.click(force=True)
                         time.sleep(1)
                         
@@ -122,21 +125,23 @@ def fast_inject_weight(job_id, tag_id, weight):
             if row.count() > 0:
                 weight_input = row.first.locator("input.weightCls, input.scan-input, input[name='articlWeight'], input:not([type='hidden']):not([type='checkbox'])").first
                 if weight_input.count() > 0:
-                    js_inject = f"""node => {{
+                    # 🚀 ANTI-BOT: Human-like typing
+                    js_enable = """node => {
                         node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
-                        node.removeAttribute('onpaste'); node.removeAttribute('oncopy'); 
-                        node.removeAttribute('oncut'); node.removeAttribute('oncontextmenu'); 
-                        node.value = '{weight}'; 
-                        node.dispatchEvent(new Event('input', {{ bubbles: true }})); 
-                        node.dispatchEvent(new Event('change', {{ bubbles: true }})); 
-                        node.dispatchEvent(new Event('blur', {{ bubbles: true }})); 
-                    }}"""
-                    weight_input.evaluate(js_inject)
+                    }"""
+                    weight_input.evaluate(js_enable)
+                    weight_input.focus()
+                    weight_input.fill("")
+                    time.sleep(random.uniform(0.1, 0.2)) 
+                    weight_input.type(weight, delay=random.randint(30, 80)) 
+                    
+                    weight_input.evaluate("node => { node.dispatchEvent(new Event('input', { bubbles: true })); node.dispatchEvent(new Event('change', { bubbles: true })); }")
                     
                     save_btn = row.first.locator("text='Save'").first
                     if save_btn.is_visible():
                         main_page = target_frame if hasattr(target_frame, 'once') else target_frame.page
                         main_page.once("dialog", lambda dialog: dialog.accept())
+                        time.sleep(random.uniform(0.2, 0.4))
                         save_btn.click(force=True)
                         time.sleep(1)
                         
@@ -153,7 +158,7 @@ def fast_inject_weight(job_id, tag_id, weight):
 # ==============================================================
 def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
     if not job_data: return "⚠️ डेटाबेस खाली है।"
-    print(f"👻 Auto Injection Started (Speed: {delay_ms}ms)... Job: {job_id}")
+    print(f"👻 Auto Injection Started (Humanized Speed)... Job: {job_id}")
     try:
         with sync_playwright() as p:
             try: browser = p.chromium.connect_over_cdp(CDP_URL)
@@ -201,19 +206,32 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
                         if weight_input.count() > 0:
                             current_val = str(weight_input.evaluate("node => node.value")).strip()
                             if current_val != weight:
-                                js_inject = f"""node => {{
+                                # 🚀 ANTI-BOT: Ek superfast human ki tarah typing
+                                js_enable = """node => {
                                     node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
-                                    node.value = '{weight}'; 
-                                    node.dispatchEvent(new Event('input', {{ bubbles: true }})); 
-                                    node.dispatchEvent(new Event('change', {{ bubbles: true }})); 
-                                }}"""
-                                weight_input.evaluate(js_inject)
+                                }"""
+                                weight_input.evaluate(js_enable)
+                                
+                                weight_input.focus()
+                                weight_input.fill("")
+                                time.sleep(random.uniform(0.1, 0.25)) # Typing shuru karne se pehle sochna
+                                
+                                # Typist speed (randomized between 30 to 70 ms per key)
+                                weight_input.type(weight, delay=random.randint(30, 70))
+                                
+                                weight_input.evaluate("node => { node.dispatchEvent(new Event('input', { bubbles: true })); node.dispatchEvent(new Event('change', { bubbles: true })); }")
+                                
                                 save_btn = target_row.locator("text='Save'").first
                                 if save_btn.is_visible():
                                     main_page = target_frame if hasattr(target_frame, 'once') else target_frame.page
                                     main_page.once("dialog", lambda dialog: dialog.accept())
+                                    
+                                    time.sleep(random.uniform(0.2, 0.5)) # Save par click karne se pehle pause
                                     save_btn.click(force=True)
-                                    time.sleep(delay_ms / 1000.0)
+                                    
+                                    # Save hone ke baad random delay (Default set kiya hua + thoda random)
+                                    base_delay = delay_ms / 1000.0
+                                    time.sleep(base_delay + random.uniform(0.1, 0.6))
                                 filled_count += 1
                 except Exception as e: print(f"⚠️ Error: {e}")
 
@@ -248,7 +266,7 @@ def extract_id_from_page(browser):
 
 
 # ==============================================================
-# 5. MASTER SCRAPING ENGINE (Thread-Safe + Search + Sort)
+# 5. MASTER SCRAPING ENGINE (Anti-Bot Humanized Turbo + Thread-Safe)
 # ==============================================================
 
 def _smart_scrape_logic():
@@ -300,10 +318,8 @@ def _smart_scrape_logic():
                 if not master_info or len(master_info) == 0:
                     return {"status": "error", "msg": "⚠️ Table mein Request No. nahi mila!"}
                 
-                # 🚀 SORTING MAGIC: Nayi Request Sabse Upar (Descending)
+                # 🚀 SORTING MAGIC
                 unique_reqs = sorted(list(master_info.keys()), key=lambda x: int(x) if str(x).isdigit() else 0, reverse=True)
-                
-                # Job Cards line se (Ascending)
                 for req in unique_reqs:
                     master_info[req] = sorted(list(set(master_info[req])), key=lambda x: int(x) if str(x).isdigit() else 0)
                 
@@ -323,14 +339,13 @@ def _smart_scrape_logic():
                     root.geometry(f"{window_width}x{window_height}+{x}+{y}")
                     root.resizable(False, False) 
                     
-                    # 🔍 SEARCH BAR UI
                     search_var = tk.StringVar()
                     tk.Label(root, text="🔍 Search Request No:", bg="#f8fafc", font=("Arial", 10, "bold"), fg="#334155").pack(pady=(10,0))
                     search_entry = tk.Entry(root, textvariable=search_var, font=("Arial", 12), relief="solid", borderwidth=1, justify="center")
                     search_entry.pack(fill="x", padx=30, pady=(5, 10))
                     
                     vars_dict = {}
-                    checkbuttons_dict = {} # Search logic ke liye
+                    checkbuttons_dict = {}
                     
                     btn_frame = tk.Frame(root, bg="#f8fafc")
                     btn_frame.pack(fill="x", padx=20, pady=5)
@@ -360,7 +375,6 @@ def _smart_scrape_logic():
                         canvas.yview_scroll(int(-1*(event.delta/120)), "units")
                     canvas.bind_all("<MouseWheel>", _on_mousewheel)
                     
-                    # Create checkboxes with GRID (for easy searching/hiding)
                     row_idx = 0
                     for req in unique_reqs:
                         var = tk.BooleanVar(value=True)
@@ -377,14 +391,13 @@ def _smart_scrape_logic():
                         checkbuttons_dict[req] = cb
                         row_idx += 1
                         
-                    # 🔍 LIVE SEARCH LOGIC
                     def filter_list(*args):
                         term = search_var.get().lower().strip()
                         for req, cb in checkbuttons_dict.items():
                             if term in req.lower():
-                                cb.grid() # Wapas dikhao
+                                cb.grid() 
                             else:
-                                cb.grid_remove() # Chhupao
+                                cb.grid_remove() 
                                 
                     search_var.trace("w", filter_list)
                         
@@ -394,9 +407,9 @@ def _smart_scrape_logic():
                         canvas.unbind_all("<MouseWheel>")
                         root.destroy()
                         
-                    tk.Button(root, text="⚡ START FAST FETCH", command=on_submit, bg="#10b981", activebackground="#059669", fg="white", activeforeground="white", font=("Arial", 11, "bold"), relief="flat", cursor="hand2", pady=8).pack(fill="x", padx=20, pady=(0, 20))
+                    tk.Button(root, text="⚡ START HUMANIZED FETCH", command=on_submit, bg="#10b981", activebackground="#059669", fg="white", activeforeground="white", font=("Arial", 11, "bold"), relief="flat", cursor="hand2", pady=8).pack(fill="x", padx=20, pady=(0, 20))
                     
-                    search_entry.focus_set() # Search bar me by default click rahega
+                    search_entry.focus_set() 
                     root.mainloop()
 
                 show_popup() 
@@ -405,7 +418,6 @@ def _smart_scrape_logic():
                     return {"status": "error", "msg": "⚠️ Aapne koi Request No. select nahi kiya!"}
                 
                 job_cards_to_process = []
-                # Keep them perfectly sorted exactly how we prepared them
                 for req in selected_requests:
                     job_cards_to_process.extend(master_info[req]) 
                     
@@ -413,13 +425,16 @@ def _smart_scrape_logic():
                 all_jobs_data = []
 
                 # =======================================================
-                # ⚡ STEP 5: TURBO SPEED SCRAPING LOOP
+                # ⚡ STEP 5: ANTI-BOT HUMANIZED SCRAPING LOOP
                 # =======================================================
                 for jc_no in job_cards_to_process:
-                    print(f"⚡ Turbo Fetching: {jc_no}...")
+                    print(f"⚡ Humanized Fetching: {jc_no}...")
                     try:
                         row_locator = list_page.locator(f"tr:has-text('{jc_no}')").first
                         action_link = row_locator.locator("a:has-text('QM Job Card View')").first
+                        
+                        # 🚀 ANTI-BOT: Aankhon se dhoondhne aur click karne me lagne wala waqt
+                        time.sleep(random.uniform(0.3, 0.8)) 
                         
                         browser_context = list_page.context if hasattr(list_page, 'context') else list_page.page.context
                         
@@ -470,7 +485,7 @@ def _smart_scrape_logic():
                         
                         items = None
                         
-                        # Turbo: Micro-polling
+                        # Micro-polling (ye safe hai kyunki JS page ke andar run hota hai)
                         for _ in range(15):  
                             for f in [new_page] + new_page.frames:
                                 try:
@@ -482,7 +497,10 @@ def _smart_scrape_logic():
                         
                         if items: 
                             all_jobs_data.append({"job_card": jc_no, "items": items})
-                            print(f"✅ Instant Grab: {len(items)} items from {jc_no}")
+                            print(f"✅ Secure Grab: {len(items)} items from {jc_no}")
+                            
+                            # 🚀 ANTI-BOT: Tab band karne se pehle chhota sa glance pause
+                            time.sleep(random.uniform(0.2, 0.5))
                         else:
                             print(f"⚠️ Data not found in {jc_no} tab")
                             
@@ -607,7 +625,6 @@ def smart_scrape_with_huid():
     result_box = []
     
     def runner():
-        # Force fresh Event Loop taaki 'Already Running' ka error kabhi na aaye!
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
@@ -618,10 +635,9 @@ def smart_scrape_with_huid():
         finally:
             loop.close()
             
-    # Naye kamre (Thread) me bot ko bheja
     t = threading.Thread(target=runner)
     t.start()
-    t.join() # UI tab tak wait karega jab tak data nahi aata
+    t.join() 
     
     if result_box: return result_box[0]
     return {"status": "error", "msg": "Unknown threading error."}
