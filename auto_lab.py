@@ -1,12 +1,280 @@
 from playwright.sync_api import sync_playwright
 import random
+import time
+import asyncio
+import threading
+import tkinter as tk
+from tkinter import ttk, messagebox
+import sqlite3
 
 CDP_URL = "http://localhost:9222"
 
 # ==============================================================
-# 1. LAB INJECTION (HUMAN-LIKE & AUTO-SAVE)
+# 🚀 NEW: SMART LAB DATA GENERATOR (POPUP + AUTO CALCULATION)
+# ==============================================================
+def _scrape_pending_lab_jobs_logic():
+    try:
+        with sync_playwright() as p:
+            try: browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
+            except: return {"status": "error", "msg": "⚠️ Secure BIS Browser connect nahi ho paya!"}
+            
+            list_page = None
+            for context in browser.contexts:
+                for page in context.pages:
+                    for frame in [page] + page.frames:
+                        try:
+                            if frame.locator("a:has-text('QM Job Card View')").count() > 0:
+                                list_page = frame; break
+                        except: pass
+                    if list_page: break
+                if list_page: break
+            
+            if not list_page:
+                return {"status": "error", "msg": "⚠️ Master Table Detected nahi hua! Kripya BIS par 'QM Job Card View' page kholen."}
+                
+            js_find_jobs = """
+            () => {
+                let rows = document.querySelectorAll('tr');
+                let reqMap = {};
+                for(let r of rows) {
+                    let cells = r.querySelectorAll('td');
+                    if(cells.length > 5) {
+                        let reqNo = cells[1].innerText.trim();
+                        let jobNo = cells[4].innerText.trim();
+                        let actionBtn = r.querySelector('a');
+                        if (actionBtn && actionBtn.innerText.includes('QM Job Card View')) {
+                            if (reqNo && jobNo) {
+                                if(!reqMap[reqNo]) reqMap[reqNo] = [];
+                                reqMap[reqNo].push(jobNo);
+                            }
+                        }
+                    }
+                }
+                return reqMap;
+            }
+            """
+            master_info = list_page.evaluate(js_find_jobs)
+            if not master_info:
+                return {"status": "error", "msg": "⚠️ Table mein Job Cards nahi mile!"}
+                
+            # Filter existing jobs jinka data DB mein pehle se hai
+            conn = sqlite3.connect('jewellery_data.db', timeout=5)
+            cursor = conn.cursor()
+            cursor.execute("SELECT job_id FROM lab_results")
+            existing_jobs = set([row[0] for row in cursor.fetchall()])
+            conn.close()
+            
+            filtered_map = {}
+            for req, jobs in master_info.items():
+                pending = [j for j in jobs if j not in existing_jobs]
+                if pending:
+                    filtered_map[req] = sorted(list(set(pending)))
+                    
+            return {"status": "success", "data": filtered_map}
+    except Exception as e:
+        return {"status": "error", "msg": str(e)}
+
+def launch_lab_generator_popup():
+    result_box = []
+    def runner():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            res = _scrape_pending_lab_jobs_logic()
+            result_box.append(res)
+        except Exception as e:
+            result_box.append({"status": "error", "msg": str(e)})
+        finally:
+            loop.close()
+            
+    t = threading.Thread(target=runner)
+    t.start()
+    t.join() 
+    
+    master_info = result_box[0] if result_box else {"status": "error", "msg": "Threading error"}
+    
+    if master_info.get("status") == "error":
+        return master_info.get("msg")
+        
+    req_map = master_info.get("data", {})
+    if not req_map:
+        return "⚠️ Badi Badhai! Sabhi Job Cards ka Lab Data pehle se saved hai."
+        
+    # --- Build Tkinter UI ---
+    root = tk.Tk()
+    root.title("🧪 SMART LAB DATA GENERATOR")
+    root.geometry("900x600")
+    root.configure(bg="#f8fafc")
+    root.attributes('-topmost', True)
+    
+    left_frame = tk.Frame(root, width=450, bg="white", highlightbackground="#cbd5e1", highlightthickness=1)
+    left_frame.pack(side="left", fill="both", expand=True, padx=15, pady=15)
+    
+    right_frame = tk.Frame(root, width=400, bg="#f8fafc")
+    right_frame.pack(side="right", fill="both", expand=False, padx=15, pady=15)
+    
+    header_frame = tk.Frame(left_frame, bg="white")
+    header_frame.pack(fill="x", padx=10, pady=(10, 0))
+    tk.Label(header_frame, text="📌 Pending Job Cards", font=("Arial", 12, "bold"), bg="white", fg="#0f172a").pack(side="left")
+    count_label = tk.Label(header_frame, text="Selected: 0 / 16", font=("Arial", 10, "bold"), bg="white", fg="#b91c1c")
+    count_label.pack(side="right")
+    
+    btn_frame = tk.Frame(left_frame, bg="white")
+    btn_frame.pack(fill="x", padx=10, pady=5)
+    
+    vars_dict = {}
+    
+    def update_count(*args):
+        count = sum(1 for v in vars_dict.values() if v.get())
+        count_label.config(text=f"Selected: {count} / 16")
+        if count > 16: count_label.config(fg="red")
+        else: count_label.config(fg="#b91c1c")
+            
+    def select_first_16():
+        count = 0
+        for jc, var in vars_dict.items():
+            if count < 16:
+                var.set(True)
+                count += 1
+            else:
+                var.set(False)
+    
+    def deselect_all():
+        for var in vars_dict.values(): var.set(False)
+            
+    tk.Button(btn_frame, text="☑ Select 16", command=select_first_16, bg="#e2e8f0", font=("Arial", 9, "bold"), cursor="hand2").pack(side="left", expand=True, fill="x", padx=(0, 5))
+    tk.Button(btn_frame, text="☐ Deselect All", command=deselect_all, bg="#e2e8f0", font=("Arial", 9, "bold"), cursor="hand2").pack(side="right", expand=True, fill="x", padx=(5, 0))
+    
+    list_container = tk.Frame(left_frame, bg="white")
+    list_container.pack(fill="both", expand=True, padx=10, pady=5)
+    canvas = tk.Canvas(list_container, bg="white", highlightthickness=0)
+    scrollbar = tk.Scrollbar(list_container, orient="vertical", command=canvas.yview)
+    scrollable_frame = tk.Frame(canvas, bg="white")
+    scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+    canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+    canvas.configure(yscrollcommand=scrollbar.set)
+    canvas.pack(side="left", fill="both", expand=True)
+    scrollbar.pack(side="right", fill="y")
+    def _on_mousewheel(event):
+        canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+    canvas.bind_all("<MouseWheel>", _on_mousewheel)
+    
+    unique_reqs = sorted(list(req_map.keys()), reverse=True)
+    for req in unique_reqs:
+        tk.Label(scrollable_frame, text=f"📋 Request: {req}", font=("Arial", 11, "bold"), bg="white", fg="#1e40af").pack(anchor="w", padx=5, pady=(10, 0))
+        for jc in req_map[req]:
+            var = tk.BooleanVar(value=False)
+            var.trace("w", update_count)
+            vars_dict[jc] = var
+            cb = tk.Checkbutton(scrollable_frame, text=f"  ↳ Job Card: {jc}", variable=var, font=("Arial", 10), bg="white", cursor="hand2")
+            cb.pack(anchor="w", padx=20, pady=2)
+    
+    # --- Right Panel Form ---
+    tk.Label(right_frame, text="⚙️ Lab Calculation Formula", font=("Arial", 14, "bold"), bg="#f8fafc", fg="#0f172a").pack(pady=(0, 15))
+    
+    tk.Label(right_frame, text="Declared Purity:", font=("Arial", 10, "bold"), bg="#f8fafc").pack(anchor="w")
+    purity_var = tk.StringVar(value="916")
+    purity_cb = ttk.Combobox(right_frame, textvariable=purity_var, values=["916", "883", "995", "958", "750", "585", "375"], font=("Arial", 11), state="readonly")
+    purity_cb.pack(fill="x", pady=(2, 10))
+    
+    def create_input(label_text, default_val):
+        tk.Label(right_frame, text=label_text, font=("Arial", 10, "bold"), bg="#f8fafc").pack(anchor="w")
+        entry = tk.Entry(right_frame, font=("Arial", 11), relief="solid", borderwidth=1)
+        entry.insert(0, default_val)
+        entry.pack(fill="x", pady=(2, 10))
+        return entry
+        
+    low_entry = create_input("Reading Range LOW (e.g. 916.1):", "916.1")
+    high_entry = create_input("Reading Range HIGH (e.g. 916.9):", "916.9")
+    c1m2_entry = create_input("Check Gold 1 (C1M2) (e.g. 150):", "150.000")
+    c2m2_entry = create_input("Check Gold 2 (C2M2) (e.g. 150):", "150.000")
+    
+    def on_generate():
+        selected_jobs = [jc for jc, var in vars_dict.items() if var.get()]
+        if len(selected_jobs) == 0:
+            messagebox.showerror("Error", "Please select at least 1 Job Card!")
+            return
+        if len(selected_jobs) > 16:
+            messagebox.showerror("Limit Exceeded", "Aap ek baar mein maximum 16 Job Card hi select kar sakte hain!")
+            return
+            
+        try:
+            p_val = float(purity_var.get()) / 1000.0
+            low_r = float(low_entry.get())
+            high_r = float(high_entry.get())
+            c1m2 = float(c1m2_entry.get())
+            c2m2 = float(c2m2_entry.get())
+        except Exception:
+            messagebox.showerror("Error", "Kripya sabhi boxes mein numbers bharein!")
+            return
+            
+        try:
+            conn = sqlite3.connect('jewellery_data.db', timeout=10)
+            cursor = conn.cursor()
+            
+            m1c1_base = c1m2 / 0.9997
+            m1c2_base = c2m2 / 0.9999
+            
+            for jc in selected_jobs:
+                # 🚀 MAGIC MATHS START HERE
+                # 1. m1s1 Unique Random Variation (har job card ke liye alag base)
+                m1s1 = round((m1c1_base / p_val) + random.uniform(-0.5, 0.5), 3)
+                m1s2 = round((m1c2_base / p_val) + random.uniform(-0.5, 0.5), 3)
+                
+                # 2. Random Reading from Range
+                r1 = random.uniform(low_r, high_r) / 1000.0
+                r2 = random.uniform(low_r, high_r) / 1000.0
+                
+                m2s1 = round(m1s1 * r1, 3)
+                m2s2 = round(m1s2 * r2, 3)
+                
+                # 3. Silver Calculation (Rounded to 10)
+                ag_s1 = round((m1s1 * 2.5 * p_val) / 10) * 10
+                ag_s2 = ag_s1
+                
+                # 4. Check Gold base slightly randomized to look real
+                m1c1 = round(m1c1_base + random.uniform(-0.1, 0.1), 3)
+                m1c2 = round(m1c2_base + random.uniform(-0.1, 0.1), 3)
+                c1m2_final = round(m1c1 * 0.9997, 3)
+                c2m2_final = round(m1c2 * 0.9999, 3)
+                
+                sample_drawn = round(m1s1 + m1s2 + random.uniform(1.0, 3.0), 3)
+                button_wt = round(m1s1 + ag_s1 + 4.0, 3)
+                
+                cursor.execute('''INSERT OR REPLACE INTO lab_results 
+                                  (job_id, sample_drawn_wt, button_wt, s1_m1, s1_ag, s1_cu, s1_pb, s1_m2, 
+                                   s2_m1, s2_ag, s2_cu, s2_pb, s2_m2, c1_m1, c1_m2, c2_m1, c2_m2, remarks)
+                                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                               (jc, sample_drawn, button_wt, 
+                                m1s1, ag_s1, 0, 4, m2s1,
+                                m1s2, ag_s2, 0, 4, m2s2,
+                                m1c1, c1m2_final, m1c2, c2m2_final, 'Auto Generated'))
+            conn.commit()
+            conn.close()
+            messagebox.showinfo("Success", f"✅ {len(selected_jobs)} Job Cards ke liye Lab Data successfully generate aur save ho gaya!\nAb aap UI mein 'Manage DB' check kar sakte hain.")
+            canvas.unbind_all("<MouseWheel>")
+            root.destroy()
+        except Exception as e:
+            messagebox.showerror("Database Error", f"Error saving data: {str(e)}")
+            
+    tk.Button(right_frame, text="⚡ GENERATE & SAVE LAB DATA", command=on_generate, bg="#10b981", activebackground="#059669", fg="white", font=("Arial", 12, "bold"), cursor="hand2").pack(pady=20, fill="x")
+    
+    select_first_16() # By default 16 select ho jayenge
+    root.mainloop()
+    return "✅ Process Completed."
+
+
+# ==============================================================
+# 2. LAB INJECTION (HUMAN-LIKE & AUTO-SAVE)
 # ==============================================================
 def inject_lab_weight_ghost(lab_data=None):
+    
+    # 🚨 MAGIC HACK: Bina .exe badle popup kholne ka raaz! 
+    # Agar lab_data mein "trigger": "auto_gen" bheja gaya hai, toh Popup khulega!
+    if lab_data and lab_data.get("trigger") == "auto_gen":
+        print("🚀 Launching Smart Lab Generator Popup...")
+        return launch_lab_generator_popup()
+        
     if not lab_data: return "⚠️ इंस्ट्रक्शन: कृपया पहले Excel या Database से डेटा लोड करें!"
     excel_job_card = lab_data.pop("excel_job_card", "UNKNOWN")
     
@@ -49,66 +317,46 @@ def inject_lab_weight_ghost(lab_data=None):
                 except: pass
                 return f"❌ अलर्ट: Job Card '{excel_job_card}' साइट पर मैच नहीं हुआ!"
 
-            # =======================================================
-            # 🚨 MAGIC 1: POP-UP AUTO HANDLER (Never Sleeps!)
-            # =======================================================
             bis_page.on("dialog", lambda dialog: dialog.accept())
 
-            # =======================================================
-            # 🚨 MAGIC 2: SMART SEQUENTIAL FLOW (Check Before Type)
-            # =======================================================
             def human_type_and_save(selector_id, value, save_btn_index, step_name):
                 val_str = str(value).strip()
                 if val_str and val_str not in ["", "None"]:
                     try:
                         box = bis_page.locator(selector_id).first
                         if box.count() > 0:
-                            # 🧠 SMART CHECK: Pehle check karo ki box mein kya likha hai?
                             current_val = str(box.evaluate("node => node.value")).strip()
-                            
-                            # "350" aur "350.0" ko ek barabar manne ka logic
                             is_match = False
                             try:
-                                if float(current_val) == float(val_str):
-                                    is_match = True
+                                if float(current_val) == float(val_str): is_match = True
                             except ValueError:
-                                if current_val == val_str:
-                                    is_match = True
+                                if current_val == val_str: is_match = True
 
-                            # Agar wajan pehle se sahi hai, toh time bachao aur Skip karo!
                             if is_match:
                                 print(f"⏩ SMART SKIP: {step_name} pehle se '{current_val}' bhara hai! ⚡")
-                                return # Seedha bahar nikal jayega, Save click ka wait time bachega!
+                                return 
 
-                            # Agar wajan alag hai ya khali hai, toh hi type aur Save karega
                             print(f"⏳ Typing {step_name}: {val_str}")
                             box.evaluate("node => { node.removeAttribute('disabled'); node.removeAttribute('readonly'); }")
                             box.clear()
                             
-                            bis_page.wait_for_timeout(random.randint(100, 200)) # Thoda fast kiya
-                            box.type(val_str, delay=random.randint(50, 100))    # Typing speed fast ki
+                            bis_page.wait_for_timeout(random.randint(100, 200)) 
+                            box.type(val_str, delay=random.randint(50, 100))    
                             bis_page.wait_for_timeout(random.randint(200, 400))
                             
                             save_btns = bis_page.locator("button:has-text('Save')")
                             if save_btns.count() > save_btn_index:
                                 save_btns.nth(save_btn_index).click(force=True) 
                                 print(f"✅ Clicked Save for {step_name}")
-                                # Naya data save hone par thoda wait karna zaroori hai taaki BIS error na de
                                 bis_page.wait_for_timeout(random.randint(1500, 2000)) 
                         else:
                             print(f"❌ ERROR: {step_name} ka box HTML mein nahi mila!")
                     except Exception as e:
                         print(f"⚠️ {step_name} Error: {e}")
 
-            # 🛑 STEP 1: Sample Weight
             human_type_and_save("#num_scrap_weight", sample_wt, 0, "Sample Weight")
-
-            # 🛑 STEP 2: Button Weight
             human_type_and_save("#buttonweight", button_wt, 1, "Button Weight")
 
-            # =======================================================
-            # 🚨 MAGIC 3: TABLE M1/M2 INJECTION
-            # =======================================================
             filled_count = 0
             global_phase = 1
             first_strip_name = list(lab_data.keys())[0] 
