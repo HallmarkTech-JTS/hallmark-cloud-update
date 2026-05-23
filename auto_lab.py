@@ -18,7 +18,6 @@ def _get_pending_jobs_from_db():
         conn = sqlite3.connect('jewellery_data.db', timeout=5)
         cursor = conn.cursor()
         
-        # 1. DB me saari tables se unique Job Cards dhoondho
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         tables = [r[0] for r in cursor.fetchall()]
         
@@ -37,7 +36,6 @@ def _get_pending_jobs_from_db():
                 
         all_jobs = list(set(all_jobs))
         
-        # 2. Jo jobs pehle se lab_results mein hain, unhe hata do
         cursor.execute("CREATE TABLE IF NOT EXISTS lab_results (job_id TEXT UNIQUE, sample_drawn_wt REAL, button_wt REAL, s1_m1 REAL, s1_ag REAL, s1_cu REAL, s1_pb REAL, s1_m2 REAL, s2_m1 REAL, s2_ag REAL, s2_cu REAL, s2_pb REAL, s2_m2 REAL, c1_m1 REAL, c1_m2 REAL, c2_m1 REAL, c2_m2 REAL, remarks TEXT)")
         cursor.execute("SELECT job_id FROM lab_results")
         done_jobs = set([str(r[0]).strip() for r in cursor.fetchall()])
@@ -62,7 +60,6 @@ def launch_lab_generator_popup():
     if not pending_jobs:
         return "⚠️ Badi Badhai! Sabhi Job Cards ka Lab Data pehle se database me saved hai."
         
-    # --- Build Tkinter UI ---
     root = tk.Tk()
     root.title("🧪 SMART LAB DATA GENERATOR")
     root.geometry("850x600")
@@ -86,11 +83,11 @@ def launch_lab_generator_popup():
     
     vars_dict = {}
     
-    # 🚨 STRICT 16 LIMIT CHECK WITH NOTICE BOX
+    # 🚨 STRICT 16 LIMIT CHECK
     def on_check_toggle(jc, var):
         count = sum(1 for v in vars_dict.values() if v.get())
         if count > 16:
-            var.set(False) # Instantly uncheck
+            var.set(False) 
             messagebox.showwarning("Limit Exceeded 🛑", "Notice: Aap ek baar mein MAX 16 Job Card hi select kar sakte hain!")
             return
         count_label.config(text=f"Selected: {count} / 16")
@@ -176,21 +173,19 @@ def launch_lab_generator_popup():
             cursor = conn.cursor()
             
             for jc in selected_jobs:
-                # 🚀 1. Formula Calculations
+                # 🚀 Formula Calculations
                 m1c1 = round(c1m2 / 0.9997, 3)
                 m1c2 = round(c2m2 / 0.9999, 3)
                 
                 m1s1 = round(m1c1 / p_val, 3)
                 m1s2 = round(m1c2 / p_val, 3)
                 
-                # Unique random reading from range for each job card
                 r1 = random.uniform(low_r, high_r) / 1000.0
                 r2 = random.uniform(low_r, high_r) / 1000.0
                 
                 m2s1 = round(m1s1 * r1, 3)
                 m2s2 = round(m1s2 * r2, 3)
                 
-                # Silver calculation rounded to nearest 10
                 ag_s1 = round((m1s1 * 2.5 * p_val) / 10) * 10
                 ag_s2 = ag_s1
                 
@@ -222,23 +217,23 @@ def launch_lab_generator_popup():
 
 
 # ==============================================================
-# 🚀 2. LAB INJECTION INTERACTION HANDLER (INTEGRATED SINGLE BUTTON)
+# 🚀 2. LAB INJECTION (WITH '999' CHEAT CODE)
 # ==============================================================
 def inject_lab_weight_ghost(lab_data=None):
+    if lab_data is None: lab_data = {}
     
-    # 🚨 INTEGRATED SHORTCUT: Agar bina data select kiye direct button click hua, 
-    # toh seedha Generator Popup khulega aur database me data save karega!
-    if lab_data is None or len(lab_data) == 0 or lab_data.get("trigger") == "auto_gen":
-        print("🚀 Direct Trigger: Launching Smart Lab Generator Popup...")
+    # 🚨 THE CHEAT CODE HACK (Bina .exe badle) 🚨
+    sample_wt_check = str(lab_data.get("sample_drawn_wt", "")).strip()
+    
+    if sample_wt_check == "999" or sample_wt_check == "999.0" or lab_data.get("trigger") == "auto_gen":
+        print("🚀 Cheat Code 999 Detected! Launching Smart Lab Generator Popup...")
         return launch_lab_generator_popup()
         
     excel_job_card = lab_data.pop("excel_job_card", "UNKNOWN")
     sample_wt = lab_data.pop("sample_drawn_wt", None)
     button_wt = lab_data.pop("button_wt", None)
 
-    if len(lab_data) == 0: 
-        print("🚀 Empty Data Trigger: Launching Smart Lab Generator Popup...")
-        return launch_lab_generator_popup()
+    if len(lab_data) == 0: return "⚠️ इंस्ट्रक्शन: कृपया पहले Excel या Database से डेटा लोड करें!"
 
     print(f"👻 Lab Smart Injection Started (JC: {excel_job_card})...")
     try:
