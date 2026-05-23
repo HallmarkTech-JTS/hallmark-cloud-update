@@ -5,7 +5,7 @@ import eel
 import asyncio
 import threading
 import tkinter as tk
-import random  # 🚀 NAYA IMPORT ANTI-BOT SYSTEM KE LIYE
+import random  # 🚀 ANTI-BOT SYSTEM KE LIYE
 
 # Playwright ke liye local browser ka URL
 CDP_URL = "http://localhost:9222"
@@ -63,15 +63,14 @@ def inject_single_reception_tag(job_id, tag_id, weight):
                 weight_input = target_row.locator("input.weightCls, input.scan-input, input[name='articlWeight'], input:not([type='hidden']):not([type='checkbox'])").first
                 
                 if weight_input.count() > 0:
-                    # 🚀 ANTI-BOT: Human-like typing
                     js_enable = """node => {
                         node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
                     }"""
                     weight_input.evaluate(js_enable)
                     weight_input.focus()
                     weight_input.fill("")
-                    time.sleep(random.uniform(0.1, 0.2)) # Chota sa pause
-                    weight_input.type(weight, delay=random.randint(30, 80)) # Human typing speed
+                    time.sleep(random.uniform(0.1, 0.2)) 
+                    weight_input.type(weight, delay=random.randint(30, 80)) 
                     
                     weight_input.evaluate("node => { node.dispatchEvent(new Event('input', { bubbles: true })); node.dispatchEvent(new Event('change', { bubbles: true })); }")
                     
@@ -79,7 +78,7 @@ def inject_single_reception_tag(job_id, tag_id, weight):
                     if save_btn.is_visible():
                         main_page = target_frame if hasattr(target_frame, 'once') else target_frame.page
                         main_page.once("dialog", lambda dialog: dialog.accept())
-                        time.sleep(random.uniform(0.2, 0.4)) # Button dabane se pehle pause
+                        time.sleep(random.uniform(0.2, 0.4)) 
                         save_btn.click(force=True)
                         time.sleep(1)
                         
@@ -125,7 +124,6 @@ def fast_inject_weight(job_id, tag_id, weight):
             if row.count() > 0:
                 weight_input = row.first.locator("input.weightCls, input.scan-input, input[name='articlWeight'], input:not([type='hidden']):not([type='checkbox'])").first
                 if weight_input.count() > 0:
-                    # 🚀 ANTI-BOT: Human-like typing
                     js_enable = """node => {
                         node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
                     }"""
@@ -206,7 +204,6 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
                         if weight_input.count() > 0:
                             current_val = str(weight_input.evaluate("node => node.value")).strip()
                             if current_val != weight:
-                                # 🚀 ANTI-BOT: Ek superfast human ki tarah typing
                                 js_enable = """node => {
                                     node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
                                 }"""
@@ -214,9 +211,8 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
                                 
                                 weight_input.focus()
                                 weight_input.fill("")
-                                time.sleep(random.uniform(0.1, 0.25)) # Typing shuru karne se pehle sochna
+                                time.sleep(random.uniform(0.1, 0.25)) 
                                 
-                                # Typist speed (randomized between 30 to 70 ms per key)
                                 weight_input.type(weight, delay=random.randint(30, 70))
                                 
                                 weight_input.evaluate("node => { node.dispatchEvent(new Event('input', { bubbles: true })); node.dispatchEvent(new Event('change', { bubbles: true })); }")
@@ -226,10 +222,9 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
                                     main_page = target_frame if hasattr(target_frame, 'once') else target_frame.page
                                     main_page.once("dialog", lambda dialog: dialog.accept())
                                     
-                                    time.sleep(random.uniform(0.2, 0.5)) # Save par click karne se pehle pause
+                                    time.sleep(random.uniform(0.2, 0.5)) 
                                     save_btn.click(force=True)
                                     
-                                    # Save hone ke baad random delay (Default set kiya hua + thoda random)
                                     base_delay = delay_ms / 1000.0
                                     time.sleep(base_delay + random.uniform(0.1, 0.6))
                                 filled_count += 1
@@ -266,166 +261,7 @@ def extract_id_from_page(browser):
 
 
 # ==============================================================
-# 5. MASTER SCRAPING ENGINE (Anti-Bot Humanized Turbo + Thread-Safe)
-# ==============================================================
-
-def _smart_scrape_logic():
-    try:
-        with sync_playwright() as p:
-            try: browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
-            except: return {"status": "error", "msg": "⚠️ Secure BIS Browser connect nahi ho paya!"}
-            
-            list_page = None
-            
-            # 🚀 STEP 1: Find Master Table Frame
-            for context in browser.contexts:
-                for page in context.pages:
-                    for frame in [page] + page.frames:
-                        try:
-                            if frame.locator("a:has-text('QM Job Card View')").count() > 0:
-                                list_page = frame; break
-                        except: pass
-                    if list_page: break
-                if list_page: break
-            
-            if list_page:
-                print("🎯 Master Table Detected! Sorting Data...")
-                
-                js_find_jobs = """
-                () => {
-                    let rows = document.querySelectorAll('tr');
-                    let reqMap = {};
-                    for(let r of rows) {
-                        let cells = r.querySelectorAll('td');
-                        if(cells.length > 5) {
-                            let reqNo = cells[1].innerText.trim();
-                            let jobNo = cells[4].innerText.trim();
-                            let actionBtn = r.querySelector('a');
-                            if (actionBtn && actionBtn.innerText.includes('QM Job Card View')) {
-                                if (reqNo && jobNo) {
-                                    if(!reqMap[reqNo]) reqMap[reqNo] = [];
-                                    reqMap[reqNo].push(jobNo);
-                                }
-                            }
-                        }
-                    }
-                    return reqMap;
-                }
-                """
-                
-                master_info = list_page.evaluate(js_find_jobs)
-                
-                if not master_info or len(master_info) == 0:
-                    return {"status": "error", "msg": "⚠️ Table mein Request No. nahi mila!"}
-                
-                # 🚀 SORTING MAGIC
-                unique_reqs = sorted(list(master_info.keys()), key=lambda x: int(x) if str(x).isdigit() else 0, reverse=True)
-                for req in unique_reqs:
-                    master_info[req] = sorted(list(set(master_info[req])), key=lambda x: int(x) if str(x).isdigit() else 0)
-                
-                selected_requests = []
-                
-                # --- NATIVE WINDOWS POPUP WITH SEARCH ---
-                def show_popup():
-                    root = tk.Tk()
-                    root.title("SELECT REQUESTS")
-                    root.attributes('-topmost', True)
-                    root.configure(bg="#f8fafc")
-                    
-                    window_width = 450
-                    window_height = 550
-                    x = (root.winfo_screenwidth() // 2) - (window_width // 2)
-                    y = (root.winfo_screenheight() // 2) - (window_height // 2)
-                    root.geometry(f"{window_width}x{window_height}+{x}+{y}")
-                    root.resizable(False, False) 
-                    
-                    search_var = tk.StringVar()
-                    tk.Label(root, text="🔍 Search Request No:", bg="#f8fafc", font=("Arial", 10, "bold"), fg="#334155").pack(pady=(10,0))
-                    search_entry = tk.Entry(root, textvariable=search_var, font=("Arial", 12), relief="solid", borderwidth=1, justify="center")
-                    search_entry.pack(fill="x", padx=30, pady=(5, 10))
-                    
-                    vars_dict = {}
-                    checkbuttons_dict = {}
-                    
-                    btn_frame = tk.Frame(root, bg="#f8fafc")
-                    btn_frame.pack(fill="x", padx=20, pady=5)
-                    
-                    def select_all():
-                        for v in vars_dict.values(): v.set(True)
-                    def deselect_all():
-                        for v in vars_dict.values(): v.set(False)
-                        
-                    tk.Button(btn_frame, text="☑ Select All", command=select_all, bg="#e2e8f0", fg="#334155", font=("Arial", 9, "bold"), relief="flat", cursor="hand2").pack(side="left", expand=True, fill="x", padx=(0, 5))
-                    tk.Button(btn_frame, text="☐ Deselect All", command=deselect_all, bg="#e2e8f0", fg="#334155", font=("Arial", 9, "bold"), relief="flat", cursor="hand2").pack(side="right", expand=True, fill="x", padx=(5, 0))
-                    
-                    list_container = tk.Frame(root, bg="white", highlightbackground="#cbd5e1", highlightthickness=1)
-                    list_container.pack(fill="both", expand=True, padx=20, pady=10)
-                    
-                    canvas = tk.Canvas(list_container, bg="white", highlightthickness=0)
-                    scrollbar = tk.Scrollbar(list_container, orient="vertical", command=canvas.yview)
-                    scrollable_frame = tk.Frame(canvas, bg="white")
-                    
-                    scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-                    canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-                    canvas.configure(yscrollcommand=scrollbar.set)
-                    canvas.pack(side="left", fill="both", expand=True)
-                    scrollbar.pack(side="right", fill="y")
-                    
-                    def _on_mousewheel(event):
-                        canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-                    canvas.bind_all("<MouseWheel>", _on_mousewheel)
-                    
-                    row_idx = 0
-                    for req in unique_reqs:
-                        var = tk.BooleanVar(value=True)
-                        vars_dict[req] = var
-                        
-                        jobs_list = master_info[req]
-                        jobs_str = ", ".join(jobs_list)
-                        if len(jobs_str) > 55: jobs_str = jobs_str[:52] + "..."
-                        
-                        display_text = f"📋 Req: {req}  ({len(jobs_list)} Jobs)\n     ↳ {jobs_str}"
-                        cb = tk.Checkbutton(scrollable_frame, text=display_text, variable=var, font=("Arial", 10), bg="white", fg="#0f172a", activebackground="white", cursor="hand2", justify="left")
-                        cb.grid(row=row_idx, column=0, sticky="w", padx=10, pady=5)
-                        
-                        checkbuttons_dict[req] = cb
-                        row_idx += 1
-                        
-                    def filter_list(*args):
-                        term = search_var.get().lower().strip()
-                        for req, cb in checkbuttons_dict.items():
-                            if term in req.lower():
-                                cb.grid() 
-                            else:
-                                cb.grid_remove() 
-                                
-                    search_var.trace("w", filter_list)
-                        
-                    def on_submit():
-                        for r, v in vars_dict.items():
-                            if v.get(): selected_requests.append(r)
-                        canvas.unbind_all("<MouseWheel>")
-                        root.destroy()
-                        
-                    tk.Button(root, text="⚡ START HUMANIZED FETCH", command=on_submit, bg="#10b981", activebackground="#059669", fg="white", activeforeground="white", font=("Arial", 11, "bold"), relief="flat", cursor="hand2", pady=8).pack(fill="x", padx=20, pady=(0, 20))
-                    
-                    search_entry.focus_set() 
-                    root.mainloop()
-
-                show_popup() 
-                
-                if not selected_requests:
-                    return {"status": "error", "msg": "⚠️ Aapne koi Request No. select nahi kiya!"}
-                
-                job_cards_to_process = []
-                for req in selected_requests:
-                    job_cards_to_process.extend(master_info[req]) 
-                    
-                print(f"📦 Arranged Jobs to Fetch: {job_cards_to_process}")
-                all_jobs_data = []
-
-                # ==============================================================
-# 5. MASTER SCRAPING ENGINE (Anti-Bot Humanized Turbo + Thread-Safe + LAB BUTTON)
+# 5. MASTER SCRAPING ENGINE (Ultimate JS Detection + LAB BUTTON)
 # ==============================================================
 
 def _smart_scrape_logic():
@@ -440,360 +276,277 @@ def _smart_scrape_logic():
             try: browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
             except: return {"status": "error", "msg": "⚠️ Secure BIS Browser connect nahi ho paya!"}
             
+            master_info = None
             list_page = None
             
-            # 🚀 STEP 1: Find Master Table Frame
-            for context in browser.contexts:
-                for page in context.pages:
-                    for frame in [page] + page.frames:
-                        try:
-                            if frame.locator("a:has-text('QM Job Card View')").count() > 0:
-                                list_page = frame; break
-                        except: pass
-                    if list_page: break
-                if list_page: break
-            
-            if list_page:
-                print("🎯 Master Table Detected! Sorting Data...")
-                
-                js_find_jobs = """
-                () => {
-                    let rows = document.querySelectorAll('tr');
-                    let reqMap = {};
-                    for(let r of rows) {
-                        let cells = r.querySelectorAll('td');
-                        if(cells.length > 5) {
-                            let reqNo = cells[1].innerText.trim();
-                            let jobNo = cells[4].innerText.trim();
-                            let actionBtn = r.querySelector('a');
-                            if (actionBtn && actionBtn.innerText.includes('QM Job Card View')) {
-                                if (reqNo && jobNo) {
-                                    if(!reqMap[reqNo]) reqMap[reqNo] = [];
-                                    reqMap[reqNo].push(jobNo);
-                                }
-                            }
-                        }
-                    }
-                    return reqMap;
-                }
-                """
-                
-                master_info = list_page.evaluate(js_find_jobs)
-                
-                if not master_info or len(master_info) == 0:
-                    return {"status": "error", "msg": "⚠️ Table mein Request No. nahi mila!"}
-                
-                # 🚀 SORTING MAGIC
-                unique_reqs = sorted(list(master_info.keys()), key=lambda x: int(x) if str(x).isdigit() else 0, reverse=True)
-                for req in unique_reqs:
-                    master_info[req] = sorted(list(set(master_info[req])), key=lambda x: int(x) if str(x).isdigit() else 0)
-                
-                selected_requests = []
-                
-                # --- NATIVE WINDOWS POPUP WITH SEARCH & LAB BUTTON ---
-                def show_popup():
-                    root = tk.Tk()
-                    root.title("SELECT REQUESTS")
-                    root.attributes('-topmost', True)
-                    root.configure(bg="#f8fafc")
-                    
-                    window_width = 450
-                    window_height = 580  # Height thodi badhai naye button ke liye
-                    x = (root.winfo_screenwidth() // 2) - (window_width // 2)
-                    y = (root.winfo_screenheight() // 2) - (window_height // 2)
-                    root.geometry(f"{window_width}x{window_height}+{x}+{y}")
-                    root.resizable(False, False) 
-                    
-                    search_var = tk.StringVar()
-                    tk.Label(root, text="🔍 Search Request No:", bg="#f8fafc", font=("Arial", 10, "bold"), fg="#334155").pack(pady=(10,0))
-                    search_entry = tk.Entry(root, textvariable=search_var, font=("Arial", 12), relief="solid", borderwidth=1, justify="center")
-                    search_entry.pack(fill="x", padx=30, pady=(5, 10))
-                    
-                    vars_dict = {}
-                    checkbuttons_dict = {}
-                    
-                    btn_frame = tk.Frame(root, bg="#f8fafc")
-                    btn_frame.pack(fill="x", padx=20, pady=5)
-                    
-                    def select_all():
-                        for v in vars_dict.values(): v.set(True)
-                    def deselect_all():
-                        for v in vars_dict.values(): v.set(False)
-                        
-                    tk.Button(btn_frame, text="☑ Select All", command=select_all, bg="#e2e8f0", fg="#334155", font=("Arial", 9, "bold"), relief="flat", cursor="hand2").pack(side="left", expand=True, fill="x", padx=(0, 5))
-                    tk.Button(btn_frame, text="☐ Deselect All", command=deselect_all, bg="#e2e8f0", fg="#334155", font=("Arial", 9, "bold"), relief="flat", cursor="hand2").pack(side="right", expand=True, fill="x", padx=(5, 0))
-                    
-                    list_container = tk.Frame(root, bg="white", highlightbackground="#cbd5e1", highlightthickness=1)
-                    list_container.pack(fill="both", expand=True, padx=20, pady=10)
-                    
-                    canvas = tk.Canvas(list_container, bg="white", highlightthickness=0)
-                    scrollbar = tk.Scrollbar(list_container, orient="vertical", command=canvas.yview)
-                    scrollable_frame = tk.Frame(canvas, bg="white")
-                    
-                    scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-                    canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-                    canvas.configure(yscrollcommand=scrollbar.set)
-                    canvas.pack(side="left", fill="both", expand=True)
-                    scrollbar.pack(side="right", fill="y")
-                    
-                    def _on_mousewheel(event):
-                        canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-                    canvas.bind_all("<MouseWheel>", _on_mousewheel)
-                    
-                    row_idx = 0
-                    for req in unique_reqs:
-                        var = tk.BooleanVar(value=True)
-                        vars_dict[req] = var
-                        
-                        jobs_list = master_info[req]
-                        jobs_str = ", ".join(jobs_list)
-                        if len(jobs_str) > 55: jobs_str = jobs_str[:52] + "..."
-                        
-                        display_text = f"📋 Req: {req}  ({len(jobs_list)} Jobs)\n     ↳ {jobs_str}"
-                        cb = tk.Checkbutton(scrollable_frame, text=display_text, variable=var, font=("Arial", 10), bg="white", fg="#0f172a", activebackground="white", cursor="hand2", justify="left")
-                        cb.grid(row=row_idx, column=0, sticky="w", padx=10, pady=5)
-                        
-                        checkbuttons_dict[req] = cb
-                        row_idx += 1
-                        
-                    def filter_list(*args):
-                        term = search_var.get().lower().strip()
-                        for req, cb in checkbuttons_dict.items():
-                            if term in req.lower():
-                                cb.grid() 
-                            else:
-                                cb.grid_remove() 
-                                
-                    search_var.trace("w", filter_list)
-                        
-                    def on_submit():
-                        for r, v in vars_dict.items():
-                            if v.get(): selected_requests.append(r)
-                        canvas.unbind_all("<MouseWheel>")
-                        root.destroy()
-
-                    # ========================================
-                    # 🪄 NAYA LAB BUTTON (BINA EXE BADLE)
-                    # ========================================
-                    def open_lab_system():
-                        canvas.unbind_all("<MouseWheel>")
-                        root.destroy() # Reception popup band karo
-                        try:
-                            import cloud_lab as al # Cloud wali file load karo
-                        except:
-                            from modules import auto_lab as al
-                        al.launch_lab_generator_popup() # Lab popup khol do!
-
-                    tk.Button(root, text="🧪 OPEN SMART LAB GENERATOR", command=open_lab_system, bg="#3b82f6", activebackground="#2563eb", fg="white", font=("Arial", 11, "bold"), cursor="hand2", pady=8).pack(fill="x", padx=20, pady=(0, 10))
-                    # ========================================
-
-                    tk.Button(root, text="⚡ START HUMANIZED FETCH", command=on_submit, bg="#10b981", activebackground="#059669", fg="white", activeforeground="white", font=("Arial", 11, "bold"), relief="flat", cursor="hand2", pady=8).pack(fill="x", padx=20, pady=(0, 20))
-                    
-                    search_entry.focus_set() 
-                    root.mainloop()
-
-                show_popup() 
-                
-                if not selected_requests:
-                    return {"status": "error", "msg": "⚠️ Aapne koi Request No. select nahi kiya! Ya fir aap Lab Setup mein gaye hain."}
-                
-                job_cards_to_process = []
-                for req in selected_requests:
-                    job_cards_to_process.extend(master_info[req]) 
-                    
-                print(f"📦 Arranged Jobs to Fetch: {job_cards_to_process}")
-                all_jobs_data = []
-
-                # =======================================================
-                # ⚡ STEP 5: ANTI-BOT HUMANIZED SCRAPING LOOP
-                # =======================================================
-                for jc_no in job_cards_to_process:
-                    print(f"⚡ Humanized Fetching: {jc_no}...")
-                    try:
-                        row_locator = list_page.locator(f"tr:has-text('{jc_no}')").first
-                        action_link = row_locator.locator("a:has-text('QM Job Card View')").first
-                        
-                        # 🚀 ANTI-BOT: Aankhon se dhoondhne aur click karne me lagne wala waqt
-                        time.sleep(random.uniform(0.3, 0.8)) 
-                        
-                        browser_context = list_page.context if hasattr(list_page, 'context') else list_page.page.context
-                        
-                        with browser_context.expect_page(timeout=10000) as new_page_info:
-                            action_link.click(force=True)
-                        
-                        new_page = new_page_info.value
-                        new_page.wait_for_load_state("domcontentloaded")
-                        
-                        js_scrape_inner = """
-                        () => {
-                            let results = [];
-                            let tables = document.querySelectorAll('table');
-                            for (let t of tables) {
-                                let text = t.innerText.toUpperCase();
-                                if (text.includes('TAG ID') || text.includes('AHC TAG')) {
-                                    let rows = t.querySelectorAll('tr');
-                                    let tagIdx = -1, catIdx = -1, huidIdx = -1, purIdx = -1;
-                                    for(let r of rows) {
-                                        let headers = Array.from(r.querySelectorAll('th, td')).map(cell => cell.innerText.trim().toUpperCase());
-                                        tagIdx = headers.findIndex(h => h.includes('TAG ID') || h.includes('AHC TAG'));
-                                        if(tagIdx !== -1) {
-                                            catIdx = headers.findIndex(h => h.includes('CATEGORY'));
-                                            huidIdx = headers.findIndex(h => h.includes('HUID'));
-                                            purIdx = headers.findIndex(h => h.includes('PURITY'));
-                                            break;
-                                        }
-                                    }
-                                    if(tagIdx === -1) continue;
-                                    for (let r of rows) {
-                                        let cells = r.querySelectorAll('td');
-                                        if (cells.length > tagIdx) {
-                                            let tag = cells[tagIdx].innerText.trim();
-                                            if (!tag || tag.toUpperCase().includes('TAG')) continue;
-                                            let cat = (catIdx !== -1 && cells.length > catIdx && cells[catIdx]) ? cells[catIdx].innerText.trim() : "-";
-                                            let huid = (huidIdx !== -1 && cells.length > huidIdx && cells[huidIdx]) ? cells[huidIdx].innerText.trim() : "";
-                                            let pur = (purIdx !== -1 && cells.length > purIdx && cells[purIdx]) ? cells[purIdx].innerText.trim() : "-";
-                                            if (huid !== "") { cat = cat + " (HUID: " + huid + ")"; }
-                                            results.push([tag, cat, pur]);
-                                        }
-                                    }
-                                    if (results.length > 0) return results;
-                                }
-                            }
-                            return null;
-                        }
-                        """
-                        
-                        items = None
-                        
-                        # Micro-polling (ye safe hai kyunki JS page ke andar run hota hai)
-                        for _ in range(15):  
-                            for f in [new_page] + new_page.frames:
-                                try:
-                                    res = f.evaluate(js_scrape_inner)
-                                    if res: items = res; break
-                                except: pass
-                            if items: break
-                            time.sleep(0.2)  
-                        
-                        if items: 
-                            all_jobs_data.append({"job_card": jc_no, "items": items})
-                            print(f"✅ Secure Grab: {len(items)} items from {jc_no}")
-                            
-                            # 🚀 ANTI-BOT: Tab band karne se pehle chhota sa glance pause
-                            time.sleep(random.uniform(0.2, 0.5))
-                        else:
-                            print(f"⚠️ Data not found in {jc_no} tab")
-                            
-                        new_page.close()
-                        
-                    except Exception as e:
-                        print(f"⚠️ Error processing {jc_no}: {e}")
-
-                if len(all_jobs_data) > 0:
-                    try:
-                        save_func = eel._exposed_functions.get('wait_for_job_card_and_save')
-                        if save_func:
-                            for idx in range(1, len(all_jobs_data)):
-                                j_data = all_jobs_data[idx]
-                                info = {"type": "Job Card", "id": j_data["job_card"]}
-                                save_func(j_data["items"], info)
-                    except Exception as e:
-                        print("Silent DB Save Error:", e)
-
-                    first_job = all_jobs_data[0]
-                    try: browser.disconnect()
-                    except: pass
-                    return {
-                        "status": "success", 
-                        "items": first_job["items"], 
-                        "extracted_info": {"type": "Job Card", "id": first_job["job_card"]}
-                    }
-                else:
-                    return {"status": "error", "msg": "⚠️ Selected Requests ke tabs se koi data nahi mila!"}
-            
-            # =======================================================
-            # 🛡️ FALLBACK: SINGLE SCRAPING
-            # =======================================================
-            extracted_info = extract_id_from_page(browser)
-            js_code_single = """
+            # 🚀 STEP 1: ULTRA SMART DETECTION (JS Injection in all frames)
+            js_find_jobs = """
             () => {
-                let results = [];
-                let tables = document.querySelectorAll('table');
-                for (let t of tables) {
-                    let text = t.innerText.toUpperCase();
-                    if (text.includes('TAG ID') || text.includes('AHC TAG')) {
-                        let rows = t.querySelectorAll('tr');
-                        let tagIdx = -1, catIdx = -1, huidIdx = -1, purIdx = -1;
-                        for(let r of rows) {
-                            let headers = Array.from(r.querySelectorAll('th, td')).map(cell => cell.innerText.trim().toUpperCase());
-                            tagIdx = headers.findIndex(h => h.includes('TAG ID') || h.includes('AHC TAG'));
-                            if(tagIdx !== -1) {
-                                catIdx = headers.findIndex(h => h.includes('CATEGORY'));
-                                huidIdx = headers.findIndex(h => h.includes('HUID'));
-                                purIdx = headers.findIndex(h => h.includes('PURITY'));
-                                break;
+                let rows = document.querySelectorAll('tr');
+                let reqMap = {};
+                let count = 0;
+                for(let r of rows) {
+                    let cells = r.querySelectorAll('td');
+                    if(cells.length >= 8) {
+                        let reqNo = cells[1].innerText.trim();
+                        let jobNo = cells[4].innerText.trim();
+                        let actionBtn = r.querySelector('a');
+                        if (actionBtn && actionBtn.innerText.includes('QM Job Card View')) {
+                            // Check for valid numbers (length > 5)
+                            if (reqNo.length > 5 && jobNo.length > 5 && !isNaN(reqNo)) {
+                                if(!reqMap[reqNo]) reqMap[reqNo] = [];
+                                reqMap[reqNo].push(jobNo);
+                                count++;
                             }
                         }
-                        if(tagIdx === -1) continue;
-                        for (let r of rows) {
-                            let cells = r.querySelectorAll('td');
-                            if (cells.length > tagIdx) {
-                                let tag = cells[tagIdx].innerText.trim();
-                                if (!tag || tag.toUpperCase().includes('TAG')) continue;
-                                let cat = (catIdx !== -1 && cells.length > catIdx && cells[catIdx]) ? cells[catIdx].innerText.trim() : "-";
-                                let huid = (huidIdx !== -1 && cells.length > huidIdx && cells[huidIdx]) ? cells[huidIdx].innerText.trim() : "";
-                                let pur = (purIdx !== -1 && cells.length > purIdx && cells[purIdx]) ? cells[purIdx].innerText.trim() : "-";
-                                if (huid !== "") { cat = cat + " (HUID: " + huid + ")"; }
-                                results.push([tag, cat, pur]);
-                            }
-                        }
-                        if (results.length > 0) return results;
                     }
                 }
+                if(count > 0) return reqMap;
                 return null;
             }
             """
-            all_scraped_items = []
-            target_frame = None
             
+            print("🎯 Scanning all hidden frames for Master Table...")
             for context in browser.contexts:
                 for page in context.pages:
                     for frame in [page] + page.frames:
                         try:
-                            res = frame.evaluate(js_code_single)
-                            if res and len(res) > 0: 
-                                target_frame = frame
+                            res = frame.evaluate(js_find_jobs)
+                            if res:
+                                master_info = res
+                                list_page = frame
                                 break
-                        except Exception: pass
-                    if target_frame: break
-                if target_frame: break
-
-            if target_frame:
-                previous_data = [] 
-                while True:
-                    res = target_frame.evaluate(js_code_single)
-                    if res and len(res) > 0 and res != previous_data:
-                        for item in res:
-                            if item not in all_scraped_items:
-                                all_scraped_items.append(item)
-                        previous_data = res
+                        except: pass
+                    if master_info: break
+                if master_info: break
+            
+            if not master_info:
+                return {"status": "error", "msg": "⚠️ Master Table Page nahi mila! Kripya BIS portal par List open karein."}
+            
+            print("🎯 Master Table Detected! Parsing Data...")
+            
+            # 🚀 SORTING MAGIC
+            unique_reqs = sorted(list(master_info.keys()), key=lambda x: int(x) if str(x).isdigit() else 0, reverse=True)
+            for req in unique_reqs:
+                master_info[req] = sorted(list(set(master_info[req])), key=lambda x: int(x) if str(x).isdigit() else 0)
+            
+            selected_requests = []
+            
+            # --- NATIVE WINDOWS POPUP WITH SEARCH & LAB BUTTON ---
+            def show_popup():
+                root = tk.Tk()
+                root.title("SELECT REQUESTS")
+                root.attributes('-topmost', True)
+                root.configure(bg="#f8fafc")
+                
+                window_width = 450
+                window_height = 580 
+                x = (root.winfo_screenwidth() // 2) - (window_width // 2)
+                y = (root.winfo_screenheight() // 2) - (window_height // 2)
+                root.geometry(f"{window_width}x{window_height}+{x}+{y}")
+                root.resizable(False, False) 
+                
+                search_var = tk.StringVar()
+                tk.Label(root, text="🔍 Search Request No:", bg="#f8fafc", font=("Arial", 10, "bold"), fg="#334155").pack(pady=(10,0))
+                search_entry = tk.Entry(root, textvariable=search_var, font=("Arial", 12), relief="solid", borderwidth=1, justify="center")
+                search_entry.pack(fill="x", padx=30, pady=(5, 10))
+                
+                vars_dict = {}
+                checkbuttons_dict = {}
+                
+                btn_frame = tk.Frame(root, bg="#f8fafc")
+                btn_frame.pack(fill="x", padx=20, pady=5)
+                
+                def select_all():
+                    for v in vars_dict.values(): v.set(True)
+                def deselect_all():
+                    for v in vars_dict.values(): v.set(False)
                     
-                    next_btn = target_frame.locator("a#tab_logic_next")
-                    if next_btn.count() > 0:
-                        btn_class = next_btn.get_attribute("class") or ""
-                        if "disabled" in btn_class: break 
-                        next_btn.click(force=True)
-                        time.sleep(1.5) 
+                tk.Button(btn_frame, text="☑ Select All", command=select_all, bg="#e2e8f0", fg="#334155", font=("Arial", 9, "bold"), relief="flat", cursor="hand2").pack(side="left", expand=True, fill="x", padx=(0, 5))
+                tk.Button(btn_frame, text="☐ Deselect All", command=deselect_all, bg="#e2e8f0", fg="#334155", font=("Arial", 9, "bold"), relief="flat", cursor="hand2").pack(side="right", expand=True, fill="x", padx=(5, 0))
+                
+                list_container = tk.Frame(root, bg="white", highlightbackground="#cbd5e1", highlightthickness=1)
+                list_container.pack(fill="both", expand=True, padx=20, pady=10)
+                
+                canvas = tk.Canvas(list_container, bg="white", highlightthickness=0)
+                scrollbar = tk.Scrollbar(list_container, orient="vertical", command=canvas.yview)
+                scrollable_frame = tk.Frame(canvas, bg="white")
+                
+                scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+                canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+                canvas.configure(yscrollcommand=scrollbar.set)
+                canvas.pack(side="left", fill="both", expand=True)
+                scrollbar.pack(side="right", fill="y")
+                
+                def _on_mousewheel(event):
+                    canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+                canvas.bind_all("<MouseWheel>", _on_mousewheel)
+                
+                row_idx = 0
+                for req in unique_reqs:
+                    var = tk.BooleanVar(value=True)
+                    vars_dict[req] = var
+                    
+                    jobs_list = master_info[req]
+                    jobs_str = ", ".join(jobs_list)
+                    if len(jobs_str) > 55: jobs_str = jobs_str[:52] + "..."
+                    
+                    display_text = f"📋 Req: {req}  ({len(jobs_list)} Jobs)\n     ↳ {jobs_str}"
+                    cb = tk.Checkbutton(scrollable_frame, text=display_text, variable=var, font=("Arial", 10), bg="white", fg="#0f172a", activebackground="white", cursor="hand2", justify="left")
+                    cb.grid(row=row_idx, column=0, sticky="w", padx=10, pady=5)
+                    
+                    checkbuttons_dict[req] = cb
+                    row_idx += 1
+                    
+                def filter_list(*args):
+                    term = search_var.get().lower().strip()
+                    for req, cb in checkbuttons_dict.items():
+                        if term in req.lower():
+                            cb.grid() 
+                        else:
+                            cb.grid_remove() 
+                            
+                search_var.trace("w", filter_list)
+                    
+                def on_submit():
+                    for r, v in vars_dict.items():
+                        if v.get(): selected_requests.append(r)
+                    canvas.unbind_all("<MouseWheel>")
+                    root.destroy()
+
+                # ========================================
+                # 🪄 NAYA LAB BUTTON (BINA EXE BADLE)
+                # ========================================
+                def open_lab_system():
+                    canvas.unbind_all("<MouseWheel>")
+                    root.destroy() 
+                    try:
+                        import cloud_lab as al 
+                    except:
+                        from modules import auto_lab as al
+                    al.launch_lab_generator_popup()
+
+                tk.Button(root, text="🧪 OPEN SMART LAB GENERATOR", command=open_lab_system, bg="#3b82f6", activebackground="#2563eb", fg="white", font=("Arial", 11, "bold"), cursor="hand2", pady=8).pack(fill="x", padx=20, pady=(0, 10))
+                # ========================================
+
+                tk.Button(root, text="⚡ START HUMANIZED FETCH", command=on_submit, bg="#10b981", activebackground="#059669", fg="white", activeforeground="white", font=("Arial", 11, "bold"), relief="flat", cursor="hand2", pady=8).pack(fill="x", padx=20, pady=(0, 20))
+                
+                search_entry.focus_set() 
+                root.mainloop()
+
+            show_popup() 
+            
+            if not selected_requests:
+                return {"status": "error", "msg": "⚠️ Aapne koi Request No. select nahi kiya! Ya fir aap Lab Setup mein gaye hain."}
+            
+            job_cards_to_process = []
+            for req in selected_requests:
+                job_cards_to_process.extend(master_info[req]) 
+                
+            print(f"📦 Arranged Jobs to Fetch: {job_cards_to_process}")
+            all_jobs_data = []
+
+            # =======================================================
+            # ⚡ STEP 5: ANTI-BOT HUMANIZED SCRAPING LOOP
+            # =======================================================
+            for jc_no in job_cards_to_process:
+                print(f"⚡ Humanized Fetching: {jc_no}...")
+                try:
+                    row_locator = list_page.locator(f"tr:has-text('{jc_no}')").first
+                    action_link = row_locator.locator("a").last # Last action button pakdega
+                    
+                    time.sleep(random.uniform(0.3, 0.8)) 
+                    
+                    browser_context = list_page.context if hasattr(list_page, 'context') else list_page.page.context
+                    
+                    with browser_context.expect_page(timeout=10000) as new_page_info:
+                        action_link.click(force=True)
+                    
+                    new_page = new_page_info.value
+                    new_page.wait_for_load_state("domcontentloaded")
+                    
+                    js_scrape_inner = """
+                    () => {
+                        let results = [];
+                        let tables = document.querySelectorAll('table');
+                        for (let t of tables) {
+                            let text = t.innerText.toUpperCase();
+                            if (text.includes('TAG ID') || text.includes('AHC TAG')) {
+                                let rows = t.querySelectorAll('tr');
+                                let tagIdx = -1, catIdx = -1, huidIdx = -1, purIdx = -1;
+                                for(let r of rows) {
+                                    let headers = Array.from(r.querySelectorAll('th, td')).map(cell => cell.innerText.trim().toUpperCase());
+                                    tagIdx = headers.findIndex(h => h.includes('TAG ID') || h.includes('AHC TAG'));
+                                    if(tagIdx !== -1) {
+                                        catIdx = headers.findIndex(h => h.includes('CATEGORY'));
+                                        huidIdx = headers.findIndex(h => h.includes('HUID'));
+                                        purIdx = headers.findIndex(h => h.includes('PURITY'));
+                                        break;
+                                    }
+                                }
+                                if(tagIdx === -1) continue;
+                                for (let r of rows) {
+                                    let cells = r.querySelectorAll('td');
+                                    if (cells.length > tagIdx) {
+                                        let tag = cells[tagIdx].innerText.trim();
+                                        if (!tag || tag.toUpperCase().includes('TAG')) continue;
+                                        let cat = (catIdx !== -1 && cells.length > catIdx && cells[catIdx]) ? cells[catIdx].innerText.trim() : "-";
+                                        let huid = (huidIdx !== -1 && cells.length > huidIdx && cells[huidIdx]) ? cells[huidIdx].innerText.trim() : "";
+                                        let pur = (purIdx !== -1 && cells.length > purIdx && cells[purIdx]) ? cells[purIdx].innerText.trim() : "-";
+                                        if (huid !== "") { cat = cat + " (HUID: " + huid + ")"; }
+                                        results.push([tag, cat, pur]);
+                                    }
+                                }
+                                if (results.length > 0) return results;
+                            }
+                        }
+                        return null;
+                    }
+                    """
+                    
+                    items = None
+                    for _ in range(15):  
+                        for f in [new_page] + new_page.frames:
+                            try:
+                                res = f.evaluate(js_scrape_inner)
+                                if res: items = res; break
+                            except: pass
+                        if items: break
+                        time.sleep(0.2)  
+                    
+                    if items: 
+                        all_jobs_data.append({"job_card": jc_no, "items": items})
+                        print(f"✅ Secure Grab: {len(items)} items from {jc_no}")
+                        time.sleep(random.uniform(0.2, 0.5))
                     else:
-                        break 
-            
-            try: browser.disconnect()
-            except: pass
-            
-            if not all_scraped_items: 
-                return {"status": "error", "msg": "⚠️ Data nahi mila! Please BIS portal par theek se page open kijiye."}
-            
-            return {"status": "success", "items": all_scraped_items, "extracted_info": extracted_info}
+                        print(f"⚠️ Data not found in {jc_no} tab")
+                        
+                    new_page.close()
+                    
+                except Exception as e:
+                    print(f"⚠️ Error processing {jc_no}: {e}")
+
+            if len(all_jobs_data) > 0:
+                try:
+                    save_func = eel._exposed_functions.get('wait_for_job_card_and_save')
+                    if save_func:
+                        for idx in range(1, len(all_jobs_data)):
+                            j_data = all_jobs_data[idx]
+                            info = {"type": "Job Card", "id": j_data["job_card"]}
+                            save_func(j_data["items"], info)
+                except Exception as e:
+                    print("Silent DB Save Error:", e)
+
+                first_job = all_jobs_data[0]
+                try: browser.disconnect()
+                except: pass
+                return {
+                    "status": "success", 
+                    "items": first_job["items"], 
+                    "extracted_info": {"type": "Job Card", "id": first_job["job_card"]}
+                }
+            else:
+                return {"status": "error", "msg": "⚠️ Selected Requests ke tabs se koi data nahi mila!"}
             
     except Exception as e: return {"status": "error", "msg": f"Script Error: {str(e)}"}
 
