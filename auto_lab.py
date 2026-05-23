@@ -10,7 +10,7 @@ import sqlite3
 CDP_URL = "http://localhost:9222"
 
 # ==============================================================
-# 🚀 NEW: SMART LAB DATA GENERATOR (DIRECT DB READ + MAX 16 LIMIT)
+# 🚀 1. SMART LAB DATA GENERATOR (DIRECT DB READ + MAX 16 LIMIT)
 # ==============================================================
 def _get_pending_jobs_from_db():
     try:
@@ -18,7 +18,7 @@ def _get_pending_jobs_from_db():
         conn = sqlite3.connect('jewellery_data.db', timeout=5)
         cursor = conn.cursor()
         
-        # 1. DB me saari tables dhoondho
+        # 1. DB me saari tables se unique Job Cards dhoondho
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         tables = [r[0] for r in cursor.fetchall()]
         
@@ -28,11 +28,9 @@ def _get_pending_jobs_from_db():
             try:
                 cursor.execute(f"PRAGMA table_info({t})")
                 cols = [c[1] for c in cursor.fetchall()]
-                # Koi bhi column jiska naam job_id ya job_card ho
                 job_col = next((c for c in cols if c in ['job_id', 'job_card', 'job_no', 'id']), None)
                 if job_col:
                     cursor.execute(f"SELECT DISTINCT {job_col} FROM {t}")
-                    # Valid Job Cards filter karo (> 6 digits)
                     fetched = [str(r[0]).strip() for r in cursor.fetchall() if str(r[0]).strip().isdigit() and len(str(r[0]).strip()) > 6]
                     all_jobs.extend(fetched)
             except: pass
@@ -62,7 +60,7 @@ def launch_lab_generator_popup():
         
     pending_jobs = db_response.get("data", [])
     if not pending_jobs:
-        return "⚠️ Badi Badhai! Sabhi Job Cards ka Lab Data pehle se saved hai."
+        return "⚠️ Badi Badhai! Sabhi Job Cards ka Lab Data pehle se database me saved hai."
         
     # --- Build Tkinter UI ---
     root = tk.Tk()
@@ -88,15 +86,15 @@ def launch_lab_generator_popup():
     
     vars_dict = {}
     
-    # 🚨 STRICT 16 LIMIT CHECK LOGIC
+    # 🚨 STRICT 16 LIMIT CHECK WITH NOTICE BOX
     def on_check_toggle(jc, var):
         count = sum(1 for v in vars_dict.values() if v.get())
         if count > 16:
-            var.set(False) # ❌ Instantly uncheck it
-            messagebox.showwarning("Limit Exceeded 🛑", "Aap ek baar mein MAXIMUM 16 Job Card hi select kar sakte hain!")
+            var.set(False) # Instantly uncheck
+            messagebox.showwarning("Limit Exceeded 🛑", "Notice: Aap ek baar mein MAX 16 Job Card hi select kar sakte hain!")
             return
         count_label.config(text=f"Selected: {count} / 16")
-        if count == 16: count_label.config(fg="#10b981") # Green if 16 reached
+        if count == 16: count_label.config(fg="#10b981")
         else: count_label.config(fg="#b91c1c")
             
     def select_first_16():
@@ -130,11 +128,9 @@ def launch_lab_generator_popup():
         canvas.yview_scroll(int(-1*(event.delta/120)), "units")
     canvas.bind_all("<MouseWheel>", _on_mousewheel)
     
-    # Render Flat List of Job Cards
     for jc in pending_jobs:
         var = tk.BooleanVar(value=False)
         vars_dict[jc] = var
-        # Pass variables to lambda safely
         cb = tk.Checkbutton(scrollable_frame, text=f"   Job Card: {jc}", variable=var, font=("Arial", 11, "bold"), bg="white", cursor="hand2", command=lambda j=jc, v=var: on_check_toggle(j, v))
         cb.pack(anchor="w", padx=10, pady=5)
     
@@ -165,43 +161,42 @@ def launch_lab_generator_popup():
             return
             
         try:
-            p_val = float(purity_var.get()) / 1000.0
+            purity_num = float(purity_var.get())
+            p_val = purity_num / 1000.0
             low_r = float(low_entry.get())
             high_r = float(high_entry.get())
             c1m2 = float(c1m2_entry.get())
             c2m2 = float(c2m2_entry.get())
         except Exception:
-            messagebox.showerror("Error", "Kripya sabhi boxes mein numbers bharein!")
+            messagebox.showerror("Error", "Kripya sabhi boxes mein sahi numbers bharein!")
             return
             
         try:
             conn = sqlite3.connect('jewellery_data.db', timeout=10)
             cursor = conn.cursor()
             
-            m1c1_base = c1m2 / 0.9997
-            m1c2_base = c2m2 / 0.9999
-            
-            import random
             for jc in selected_jobs:
-                m1s1 = round((m1c1_base / p_val) + random.uniform(-0.5, 0.5), 3)
-                m1s2 = round((m1c2_base / p_val) + random.uniform(-0.5, 0.5), 3)
+                # 🚀 1. Formula Calculations
+                m1c1 = round(c1m2 / 0.9997, 3)
+                m1c2 = round(c2m2 / 0.9999, 3)
                 
+                m1s1 = round(m1c1 / p_val, 3)
+                m1s2 = round(m1c2 / p_val, 3)
+                
+                # Unique random reading from range for each job card
                 r1 = random.uniform(low_r, high_r) / 1000.0
                 r2 = random.uniform(low_r, high_r) / 1000.0
                 
                 m2s1 = round(m1s1 * r1, 3)
                 m2s2 = round(m1s2 * r2, 3)
                 
+                # Silver calculation rounded to nearest 10
                 ag_s1 = round((m1s1 * 2.5 * p_val) / 10) * 10
                 ag_s2 = ag_s1
                 
-                m1c1 = round(m1c1_base + random.uniform(-0.1, 0.1), 3)
-                m1c2 = round(m1c2_base + random.uniform(-0.1, 0.1), 3)
-                c1m2_final = round(m1c1 * 0.9997, 3)
-                c2m2_final = round(m1c2 * 0.9999, 3)
-                
-                sample_drawn = round(m1s1 + m1s2 + random.uniform(1.0, 3.0), 3)
-                button_wt = round(m1s1 + ag_s1 + 4.0, 3)
+                # 🚀 AUTOMATIC WEIGHT GENERATION (310 to 450 Range)
+                sample_drawn = round(random.uniform(310.0, 450.0), 3)
+                button_wt = round(random.uniform(310.0, 450.0), 3)
                 
                 cursor.execute('''INSERT OR REPLACE INTO lab_results 
                                   (job_id, sample_drawn_wt, button_wt, s1_m1, s1_ag, s1_cu, s1_pb, s1_m2, 
@@ -210,10 +205,10 @@ def launch_lab_generator_popup():
                                (jc, sample_drawn, button_wt, 
                                 m1s1, ag_s1, 0, 4, m2s1,
                                 m1s2, ag_s2, 0, 4, m2s2,
-                                m1c1, c1m2_final, m1c2, c2m2_final, 'Auto Generated'))
+                                m1c1, c1m2, m1c2, c2m2, 'Auto Generated'))
             conn.commit()
             conn.close()
-            messagebox.showinfo("Success", f"✅ {len(selected_jobs)} Job Cards ke liye Lab Data successfully save ho gaya!")
+            messagebox.showinfo("Success", f"✅ {len(selected_jobs)} Job Cards ke liye Lab Data successfully database me save ho gaya!")
             canvas.unbind_all("<MouseWheel>")
             root.destroy()
         except Exception as e:
@@ -227,23 +222,23 @@ def launch_lab_generator_popup():
 
 
 # ==============================================================
-# 2. LAB INJECTION (HUMAN-LIKE & AUTO-SAVE)
+# 🚀 2. LAB INJECTION INTERACTION HANDLER (INTEGRATED SINGLE BUTTON)
 # ==============================================================
 def inject_lab_weight_ghost(lab_data=None):
     
-    # 🚨 MAGIC HACK: Bina .exe badle popup kholne ka raaz! 
-    # Agar lab_data mein "trigger": "auto_gen" bheja gaya hai, toh Popup khulega!
-    if lab_data and lab_data.get("trigger") == "auto_gen":
-        print("🚀 Launching Smart Lab Generator Popup...")
+    # 🚨 INTEGRATED SHORTCUT: Agar bina data select kiye direct button click hua, 
+    # toh seedha Generator Popup khulega aur database me data save karega!
+    if lab_data is None or len(lab_data) == 0 or lab_data.get("trigger") == "auto_gen":
+        print("🚀 Direct Trigger: Launching Smart Lab Generator Popup...")
         return launch_lab_generator_popup()
         
-    if not lab_data: return "⚠️ इंस्ट्रक्शन: कृपया पहले Excel या Database से डेटा लोड करें!"
     excel_job_card = lab_data.pop("excel_job_card", "UNKNOWN")
-    
     sample_wt = lab_data.pop("sample_drawn_wt", None)
     button_wt = lab_data.pop("button_wt", None)
 
-    if len(lab_data) == 0: return "⚠️ इंस्ट्रक्शन: इंजेक्ट करने के लिए डेटा नहीं मिला!"
+    if len(lab_data) == 0: 
+        print("🚀 Empty Data Trigger: Launching Smart Lab Generator Popup...")
+        return launch_lab_generator_popup()
 
     print(f"👻 Lab Smart Injection Started (JC: {excel_job_card})...")
     try:
@@ -267,12 +262,10 @@ def inject_lab_weight_ghost(lab_data=None):
                                 site_job_card = page.locator("#str_job_no").input_value().strip()
 
                             if excel_job_card in site_job_card:
-                                bis_page = page
-                                break 
+                                bis_page = page; break 
                         except: continue 
                     else:
-                        bis_page = page
-                        break
+                        bis_page = page; break
             
             if not bis_page:
                 try: browser.disconnect() 
@@ -295,7 +288,7 @@ def inject_lab_weight_ghost(lab_data=None):
                                 if current_val == val_str: is_match = True
 
                             if is_match:
-                                print(f"⏩ SMART SKIP: {step_name} pehle se '{current_val}' bhara hai! ⚡")
+                                print(f"⏩ SMART SKIP: {step_name} pehle se bhara hai! ⚡")
                                 return 
 
                             print(f"⏳ Typing {step_name}: {val_str}")
@@ -312,7 +305,7 @@ def inject_lab_weight_ghost(lab_data=None):
                                 print(f"✅ Clicked Save for {step_name}")
                                 bis_page.wait_for_timeout(random.randint(1500, 2000)) 
                         else:
-                            print(f"❌ ERROR: {step_name} ka box HTML mein nahi mila!")
+                            print(f"❌ ERROR: {step_name} ka box nahi mila!")
                     except Exception as e:
                         print(f"⚠️ {step_name} Error: {e}")
 
