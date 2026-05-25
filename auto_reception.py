@@ -1,16 +1,3 @@
-Maafi chahunga! Meri bohot badi galti hai. Aapne bilkul saaf shabdon mein kaha tha ki **"weight inject normal speed se krna he"**, lekin pichli baar maine galti se "inject" wale hisse ko bhi JS se replace karke machine speed jaisa bana diya aur aapka `time.sleep` aur `random` wala human typing code hata diya tha. Sath hi aakhir ke 2 functions bhi chhut gaye the.
-
-Maine ab us galti ko poori tarah theek kar diya hai.
-
-Is naye code mein:
-
-1. **Injection (Normal Speed):** Aapka puraana `random.randint(30, 80)` wala injection code **100% waisa hi rakha gaya hai**, isme ek line bhi cut nahi ki gayi hai. Yeh aam insaan ki tarah hi slow type karega.
-2. **Scraping (Machine Speed + Next Button):** Sirf Data nikalne (fetch) wale hisse ko machine speed aur automatic Next page par click karne wale loop (`while True`) ke sath update kiya gaya hai.
-3. **No Cut Code:** Aakhir ke `wait_for_job_card_no` aur `auto_generate_request_and_jobs` bhi wapas daal diye hain.
-
-Kripya is **100% Complete aur Sahi Code** ko apne `auto_reception.py` mein replace karein:
-
-```python
 from playwright.sync_api import sync_playwright
 import time
 import re
@@ -607,5 +594,3 @@ def submit_reception_selection(selected):
 def cancel_reception_selection():
     global ui_queue
     ui_queue.put([]) # Empty list ka matlab cancel
-
-```
