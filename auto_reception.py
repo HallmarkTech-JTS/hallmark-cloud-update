@@ -2,13 +2,12 @@ from playwright.sync_api import sync_playwright
 import time
 import re
 import eel  
-import asyncio
-import threading
-import random  # 🚀 ANTI-BOT SYSTEM KE LIYE
+import random
+import queue
+import concurrent.futures
 
-# 🌟 NAYA: Web UI ke liye global variables
-ui_selection = []
-ui_event = threading.Event()
+# 🌟 NAYA: Web UI ke liye global Queue (Hang hone se bachane ke liye)
+ui_queue = queue.Queue()
 
 # Playwright ke liye local browser ka URL
 CDP_URL = "http://localhost:9222"
@@ -264,7 +263,7 @@ def extract_id_from_page(browser):
 
 
 # ==============================================================
-# 5. MASTER SCRAPING ENGINE (Ultimate JS Detection + HTML MODAL)
+# 5. MASTER SCRAPING ENGINE (Ultimate JS Detection + QUEUE MODAL)
 # ==============================================================
 
 def _smart_scrape_logic():
@@ -333,11 +332,10 @@ def _smart_scrape_logic():
                 master_info[req] = sorted(list(set(master_info[req])), key=lambda x: int(x) if str(x).isdigit() else 0)
             
             # ========================================
-            # 🌟 NAYA: PROFESSIONAL HTML MODAL TRIGGER
+            # 🌟 NAYA: PROFESSIONAL QUEUE TRIGGER
             # ========================================
-            global ui_selection, ui_event
-            ui_selection = []
-            ui_event.clear()
+            global ui_queue
+            ui_queue = queue.Queue() # Purani queue clear
             
             try:
                 print("📩 Calling JS Modal...")
@@ -346,17 +344,15 @@ def _smart_scrape_logic():
             except Exception as e:
                 return {"status": "error", "msg": f"UI Bridge Error: {e}"}
             
-            # 🚨 FIX: Hamesha ke liye wait nahi karega, 30 second baad timeout ho jayega
-            print("⏳ Waiting for user input in Modal...")
-            is_set = ui_event.wait(timeout=30) 
+            # 🚨 FIX: Queue se result ka wait karega, block/hang nahi hoga
+            print("⏳ Waiting for user input in Modal (Queue Mode)...")
+            try:
+                selected_requests = ui_queue.get(timeout=300) # 5 minutes time limit
+            except queue.Empty:
+                return {"status": "error", "msg": "⚠️ Time out! Modal response nahi mila."}
             
-            if not is_set:
-                return {"status": "error", "msg": "⚠️ Time out! Modal nahi khula ya user ne response nahi diya."}
-            
-            if not ui_selection:
-                return {"status": "error", "msg": "⚠️ User ne Cancel button dabaya ya selection null hai."}
-            
-            selected_requests = ui_selection
+            if not selected_requests:
+                return {"status": "error", "msg": "⚠️ User ne Cancel button dabaya."}
             # ========================================
             
             # 🌟 NAYA CODE: Request Number aur Job Card ko ek sath map karke list me daalna
@@ -483,12 +479,10 @@ def _smart_scrape_logic():
 # ==============================================================
 # 🚀 NAYA: GUARANTEED EVENT LOOP FIX (THREAD-SAFE WRAPPER)
 # ==============================================================
-import concurrent.futures
 
 def smart_scrape_with_huid():
     print("🚀 THREAD-SAFE TURBO SCRAPER CALLED!")
     try:
-        # Yeh Playwright ko ekdum saaf aur nayi thread me chalayega, bina clash ke!
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             future = executor.submit(_smart_scrape_logic)
             return future.result()
@@ -521,7 +515,6 @@ def wait_for_job_card_no():
             if not job_card_no: return {"status": "error", "msg": "⚠️ Time out!"}
             return {"status": "success", "job_card": job_card_no}
     except Exception as e: return {"status": "error", "msg": str(e)}
-
 
 # ==============================================================
 # 7. AUTO GENERATE REQUEST & JOB CARDS (Master Automation)
@@ -600,6 +593,18 @@ def auto_generate_request_and_jobs(jeweller_code, state, items_list):
                 "request_number": request_number, 
                 "job_cards": job_cards
             }
-
     except Exception as e: 
         return {"status": "error", "msg": f"⚠️ Error: {str(e)}"}
+
+# ==============================================================
+# 🌟 NAYA FEATURE: RECEPTION WEB POPUP BRIDGE
+# ==============================================================
+@eel.expose
+def submit_reception_selection(selected):
+    global ui_queue
+    ui_queue.put(selected)
+
+@eel.expose
+def cancel_reception_selection():
+    global ui_queue
+    ui_queue.put([]) # Empty list ka matlab cancel
