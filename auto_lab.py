@@ -1,41 +1,25 @@
 from playwright.sync_api import sync_playwright
 import random
 import time
-import asyncio
-import threading
-import tkinter as tk
-from tkinter import ttk, messagebox
 import sqlite3
 
 CDP_URL = "http://localhost:9222"
 
 # ==============================================================
-# 🚀 1. SMART LAB DATA GENERATOR (DIRECT DB READ + MAX 16 LIMIT)
+# 🚀 1. PRO-MODE: GET PENDING JOBS FROM DB (No UI)
 # ==============================================================
-def _get_pending_jobs_from_db():
+def get_pending_lab_jobs():
+    """Sirf Database se un Job Cards ko nikalega jinka Lab data abhi nahi bana hai."""
     try:
-        import sqlite3
         conn = sqlite3.connect('jewellery_data.db', timeout=5)
         cursor = conn.cursor()
         
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        tables = [r[0] for r in cursor.fetchall()]
-        
-        all_jobs = []
-        for t in tables:
-            if t in ["lab_results", "sqlite_sequence"]: continue
-            try:
-                cursor.execute(f"PRAGMA table_info({t})")
-                cols = [c[1] for c in cursor.fetchall()]
-                job_col = next((c for c in cols if c in ['job_id', 'job_card', 'job_no', 'id']), None)
-                if job_col:
-                    cursor.execute(f"SELECT DISTINCT {job_col} FROM {t}")
-                    fetched = [str(r[0]).strip() for r in cursor.fetchall() if str(r[0]).strip().isdigit() and len(str(r[0]).strip()) > 6]
-                    all_jobs.extend(fetched)
-            except: pass
-                
+        # 1. Main job_cards table se valid jobs nikalo
+        cursor.execute("SELECT DISTINCT job_id FROM job_cards")
+        all_jobs = [str(r[0]).strip() for r in cursor.fetchall() if str(r[0]).strip().isdigit() and len(str(r[0]).strip()) > 6]
         all_jobs = list(set(all_jobs))
         
+        # 2. Jo jobs pehle se lab_results mein hain, unhe hata do
         cursor.execute("CREATE TABLE IF NOT EXISTS lab_results (job_id TEXT UNIQUE, sample_drawn_wt REAL, button_wt REAL, s1_m1 REAL, s1_ag REAL, s1_cu REAL, s1_pb REAL, s1_m2 REAL, s2_m1 REAL, s2_ag REAL, s2_cu REAL, s2_pb REAL, s2_m2 REAL, c1_m1 REAL, c1_m2 REAL, c2_m1 REAL, c2_m2 REAL, remarks TEXT)")
         cursor.execute("SELECT job_id FROM lab_results")
         done_jobs = set([str(r[0]).strip() for r in cursor.fetchall()])
@@ -47,193 +31,69 @@ def _get_pending_jobs_from_db():
     except Exception as e:
         return {"status": "error", "msg": str(e)}
 
-def launch_lab_generator_popup():
-    import tkinter as tk
-    from tkinter import ttk, messagebox
-    import sqlite3
-    
-    db_response = _get_pending_jobs_from_db()
-    if db_response["status"] == "error":
-        return db_response["msg"]
+# ==============================================================
+# 🚀 2. PRO-MODE: GENERATE LAB DATA MATH LOGIC (Background Calculation)
+# ==============================================================
+def generate_pro_lab_data(selected_jobs, purity_val, low_r, high_r, c1m2, c2m2):
+    """UI se data aayega, ye function calculate karke DB me save karega."""
+    if not selected_jobs or len(selected_jobs) == 0:
+        return {"status": "error", "msg": "No jobs selected for generation."}
         
-    pending_jobs = db_response.get("data", [])
-    if not pending_jobs:
-        return "⚠️ Badi Badhai! Sabhi Job Cards ka Lab Data pehle se database me saved hai."
+    try:
+        p_val = float(purity_val) / 1000.0
+        conn = sqlite3.connect('jewellery_data.db', timeout=10)
+        cursor = conn.cursor()
         
-    root = tk.Tk()
-    root.title("🧪 SMART LAB DATA GENERATOR")
-    root.geometry("850x600")
-    root.configure(bg="#f8fafc")
-    root.attributes('-topmost', True)
-    
-    left_frame = tk.Frame(root, width=400, bg="white", highlightbackground="#cbd5e1", highlightthickness=1)
-    left_frame.pack(side="left", fill="both", expand=True, padx=15, pady=15)
-    
-    right_frame = tk.Frame(root, width=400, bg="#f8fafc")
-    right_frame.pack(side="right", fill="both", expand=False, padx=15, pady=15)
-    
-    header_frame = tk.Frame(left_frame, bg="white")
-    header_frame.pack(fill="x", padx=10, pady=(10, 0))
-    tk.Label(header_frame, text="📌 Pending Database Jobs", font=("Arial", 12, "bold"), bg="white", fg="#0f172a").pack(side="left")
-    count_label = tk.Label(header_frame, text="Selected: 0 / 16", font=("Arial", 10, "bold"), bg="white", fg="#b91c1c")
-    count_label.pack(side="right")
-    
-    btn_frame = tk.Frame(left_frame, bg="white")
-    btn_frame.pack(fill="x", padx=10, pady=5)
-    
-    vars_dict = {}
-    
-    # 🚨 STRICT 16 LIMIT CHECK
-    def on_check_toggle(jc, var):
-        count = sum(1 for v in vars_dict.values() if v.get())
-        if count > 16:
-            var.set(False) 
-            messagebox.showwarning("Limit Exceeded 🛑", "Notice: Aap ek baar mein MAX 16 Job Card hi select kar sakte hain!")
-            return
-        count_label.config(text=f"Selected: {count} / 16")
-        if count == 16: count_label.config(fg="#10b981")
-        else: count_label.config(fg="#b91c1c")
+        for jc in selected_jobs:
+            # 🚀 Formula Calculations
+            m1c1_base = c1m2 / 0.9997
+            m1c2_base = c2m2 / 0.9999
             
-    def select_first_16():
-        count = 0
-        for jc, var in vars_dict.items():
-            if count < 16:
-                var.set(True)
-                count += 1
-            else:
-                var.set(False)
-        count_label.config(text=f"Selected: {count} / 16", fg="#10b981" if count==16 else "#b91c1c")
-    
-    def deselect_all():
-        for var in vars_dict.values(): var.set(False)
-        count_label.config(text="Selected: 0 / 16", fg="#b91c1c")
+            m1s1 = round((m1c1_base / p_val) + random.uniform(-0.5, 0.5), 3)
+            m1s2 = round((m1c2_base / p_val) + random.uniform(-0.5, 0.5), 3)
             
-    tk.Button(btn_frame, text="☑ Select 16", command=select_first_16, bg="#e2e8f0", font=("Arial", 9, "bold"), cursor="hand2").pack(side="left", expand=True, fill="x", padx=(0, 5))
-    tk.Button(btn_frame, text="☐ Deselect All", command=deselect_all, bg="#e2e8f0", font=("Arial", 9, "bold"), cursor="hand2").pack(side="right", expand=True, fill="x", padx=(5, 0))
-    
-    list_container = tk.Frame(left_frame, bg="white")
-    list_container.pack(fill="both", expand=True, padx=10, pady=5)
-    canvas = tk.Canvas(list_container, bg="white", highlightthickness=0)
-    scrollbar = tk.Scrollbar(list_container, orient="vertical", command=canvas.yview)
-    scrollable_frame = tk.Frame(canvas, bg="white")
-    scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-    canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-    canvas.configure(yscrollcommand=scrollbar.set)
-    canvas.pack(side="left", fill="both", expand=True)
-    scrollbar.pack(side="right", fill="y")
-    def _on_mousewheel(event):
-        canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-    canvas.bind_all("<MouseWheel>", _on_mousewheel)
-    
-    for jc in pending_jobs:
-        var = tk.BooleanVar(value=False)
-        vars_dict[jc] = var
-        cb = tk.Checkbutton(scrollable_frame, text=f"   Job Card: {jc}", variable=var, font=("Arial", 11, "bold"), bg="white", cursor="hand2", command=lambda j=jc, v=var: on_check_toggle(j, v))
-        cb.pack(anchor="w", padx=10, pady=5)
-    
-    # --- Right Panel Form ---
-    tk.Label(right_frame, text="⚙️ Lab Calculation Formula", font=("Arial", 14, "bold"), bg="#f8fafc", fg="#0f172a").pack(pady=(0, 15))
-    
-    tk.Label(right_frame, text="Declared Purity:", font=("Arial", 10, "bold"), bg="#f8fafc").pack(anchor="w")
-    purity_var = tk.StringVar(value="916")
-    purity_cb = ttk.Combobox(right_frame, textvariable=purity_var, values=["916", "883", "995", "958", "750", "585", "375"], font=("Arial", 11), state="readonly")
-    purity_cb.pack(fill="x", pady=(2, 10))
-    
-    def create_input(label_text, default_val):
-        tk.Label(right_frame, text=label_text, font=("Arial", 10, "bold"), bg="#f8fafc").pack(anchor="w")
-        entry = tk.Entry(right_frame, font=("Arial", 11), relief="solid", borderwidth=1)
-        entry.insert(0, default_val)
-        entry.pack(fill="x", pady=(2, 10))
-        return entry
-        
-    low_entry = create_input("Reading Range LOW (e.g. 916.1):", "916.1")
-    high_entry = create_input("Reading Range HIGH (e.g. 916.9):", "916.9")
-    c1m2_entry = create_input("Check Gold 1 (C1M2) (e.g. 150):", "150.000")
-    c2m2_entry = create_input("Check Gold 2 (C2M2) (e.g. 150):", "150.000")
-    
-    def on_generate():
-        selected_jobs = [jc for jc, var in vars_dict.items() if var.get()]
-        if len(selected_jobs) == 0:
-            messagebox.showerror("Error", "Please select at least 1 Job Card!")
-            return
+            r1 = random.uniform(low_r, high_r) / 1000.0
+            r2 = random.uniform(low_r, high_r) / 1000.0
             
-        try:
-            purity_num = float(purity_var.get())
-            p_val = purity_num / 1000.0
-            low_r = float(low_entry.get())
-            high_r = float(high_entry.get())
-            c1m2 = float(c1m2_entry.get())
-            c2m2 = float(c2m2_entry.get())
-        except Exception:
-            messagebox.showerror("Error", "Kripya sabhi boxes mein sahi numbers bharein!")
-            return
+            m2s1 = round(m1s1 * r1, 3)
+            m2s2 = round(m1s2 * r2, 3)
             
-        try:
-            conn = sqlite3.connect('jewellery_data.db', timeout=10)
-            cursor = conn.cursor()
+            ag_s1 = round((m1s1 * 2.5 * p_val) / 10) * 10
+            ag_s2 = ag_s1
             
-            for jc in selected_jobs:
-                # 🚀 Formula Calculations
-                m1c1 = round(c1m2 / 0.9997, 3)
-                m1c2 = round(c2m2 / 0.9999, 3)
-                
-                m1s1 = round(m1c1 / p_val, 3)
-                m1s2 = round(m1c2 / p_val, 3)
-                
-                r1 = random.uniform(low_r, high_r) / 1000.0
-                r2 = random.uniform(low_r, high_r) / 1000.0
-                
-                m2s1 = round(m1s1 * r1, 3)
-                m2s2 = round(m1s2 * r2, 3)
-                
-                ag_s1 = round((m1s1 * 2.5 * p_val) / 10) * 10
-                ag_s2 = ag_s1
-                
-                # 🚀 AUTOMATIC WEIGHT GENERATION (310 to 450 Range)
-                sample_drawn = round(random.uniform(310.0, 450.0), 3)
-                button_wt = round(random.uniform(310.0, 450.0), 3)
-                
-                cursor.execute('''INSERT OR REPLACE INTO lab_results 
-                                  (job_id, sample_drawn_wt, button_wt, s1_m1, s1_ag, s1_cu, s1_pb, s1_m2, 
-                                   s2_m1, s2_ag, s2_cu, s2_pb, s2_m2, c1_m1, c1_m2, c2_m1, c2_m2, remarks)
-                                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                               (jc, sample_drawn, button_wt, 
-                                m1s1, ag_s1, 0, 4, m2s1,
-                                m1s2, ag_s2, 0, 4, m2s2,
-                                m1c1, c1m2, m1c2, c2m2, 'Auto Generated'))
-            conn.commit()
-            conn.close()
-            messagebox.showinfo("Success", f"✅ {len(selected_jobs)} Job Cards ke liye Lab Data successfully database me save ho gaya!")
-            canvas.unbind_all("<MouseWheel>")
-            root.destroy()
-        except Exception as e:
-            messagebox.showerror("Database Error", f"Error saving data: {str(e)}")
+            m1c1 = round(m1c1_base + random.uniform(-0.1, 0.1), 3)
+            m1c2 = round(m1c2_base + random.uniform(-0.1, 0.1), 3)
+            c1m2_final = round(m1c1 * 0.9997, 3)
+            c2m2_final = round(m1c2 * 0.9999, 3)
             
-    tk.Button(right_frame, text="⚡ GENERATE & SAVE LAB DATA", command=on_generate, bg="#10b981", activebackground="#059669", fg="white", font=("Arial", 12, "bold"), cursor="hand2").pack(pady=20, fill="x")
-    
-    select_first_16() 
-    root.mainloop()
-    return "✅ Process Completed."
-
+            # 🚀 AUTOMATIC WEIGHT GENERATION (310 to 450 Range)
+            sample_drawn = round(random.uniform(310.0, 450.0), 3)
+            button_wt = round(random.uniform(310.0, 450.0), 3)
+            
+            cursor.execute('''INSERT OR REPLACE INTO lab_results 
+                              (job_id, sample_drawn_wt, button_wt, s1_m1, s1_ag, s1_cu, s1_pb, s1_m2, 
+                               s2_m1, s2_ag, s2_cu, s2_pb, s2_m2, c1_m1, c1_m2, c2_m1, c2_m2, remarks)
+                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                           (jc, sample_drawn, button_wt, 
+                            m1s1, ag_s1, 0, 4, m2s1,
+                            m1s2, ag_s2, 0, 4, m2s2,
+                            m1c1, c1m2_final, m1c2, c2m2_final, 'Auto Generated'))
+        conn.commit()
+        conn.close()
+        return {"status": "success", "msg": f"✅ {len(selected_jobs)} Job Cards ke liye Lab Data successfully generate aur save ho gaya!"}
+    except Exception as e:
+        return {"status": "error", "msg": f"Database Error: {str(e)}"}
 
 # ==============================================================
-# 🚀 2. LAB INJECTION (WITH '999' CHEAT CODE)
+# 🚀 3. LAB INJECTION (Pure Bot Engine - No Cheat Codes)
 # ==============================================================
 def inject_lab_weight_ghost(lab_data=None):
-    if lab_data is None: lab_data = {}
-    
-    # 🚨 THE CHEAT CODE HACK (Bina .exe badle) 🚨
-    sample_wt_check = str(lab_data.get("sample_drawn_wt", "")).strip()
-    
-    if sample_wt_check == "999" or sample_wt_check == "999.0" or lab_data.get("trigger") == "auto_gen":
-        print("🚀 Cheat Code 999 Detected! Launching Smart Lab Generator Popup...")
-        return launch_lab_generator_popup()
+    if lab_data is None or len(lab_data) == 0:
+        return "⚠️ इंस्ट्रक्शन: कृपया पहले डेटा लोड करें!"
         
     excel_job_card = lab_data.pop("excel_job_card", "UNKNOWN")
     sample_wt = lab_data.pop("sample_drawn_wt", None)
     button_wt = lab_data.pop("button_wt", None)
-
-    if len(lab_data) == 0: return "⚠️ इंस्ट्रक्शन: कृपया पहले Excel या Database से डेटा लोड करें!"
 
     print(f"👻 Lab Smart Injection Started (JC: {excel_job_card})...")
     try:

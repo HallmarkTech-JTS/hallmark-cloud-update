@@ -4,8 +4,11 @@ import re
 import eel  
 import asyncio
 import threading
-import tkinter as tk
 import random  # 🚀 ANTI-BOT SYSTEM KE LIYE
+
+# 🌟 NAYA: Web UI ke liye global variables
+ui_selection = []
+ui_event = threading.Event()
 
 # Playwright ke liye local browser ka URL
 CDP_URL = "http://localhost:9222"
@@ -261,7 +264,7 @@ def extract_id_from_page(browser):
 
 
 # ==============================================================
-# 5. MASTER SCRAPING ENGINE (Ultimate JS Detection + LAB BUTTON)
+# 5. MASTER SCRAPING ENGINE (Ultimate JS Detection + HTML MODAL)
 # ==============================================================
 
 def _smart_scrape_logic():
@@ -269,7 +272,6 @@ def _smart_scrape_logic():
         from playwright.sync_api import sync_playwright
         import time
         import eel
-        import tkinter as tk
         import random
         
         with sync_playwright() as p:
@@ -330,127 +332,50 @@ def _smart_scrape_logic():
             for req in unique_reqs:
                 master_info[req] = sorted(list(set(master_info[req])), key=lambda x: int(x) if str(x).isdigit() else 0)
             
-            selected_requests = []
+            # ========================================
+            # 🌟 NAYA: PROFESSIONAL HTML MODAL TRIGGER
+            # ========================================
+            global ui_selection, ui_event
+            ui_selection = []
+            ui_event.clear()
             
-            # --- NATIVE WINDOWS POPUP WITH SEARCH & LAB BUTTON ---
-            def show_popup():
-                root = tk.Tk()
-                root.title("SELECT REQUESTS")
-                root.attributes('-topmost', True)
-                root.configure(bg="#f8fafc")
-                
-                window_width = 450
-                window_height = 580 
-                x = (root.winfo_screenwidth() // 2) - (window_width // 2)
-                y = (root.winfo_screenheight() // 2) - (window_height // 2)
-                root.geometry(f"{window_width}x{window_height}+{x}+{y}")
-                root.resizable(False, False) 
-                
-                search_var = tk.StringVar()
-                tk.Label(root, text="🔍 Search Request No:", bg="#f8fafc", font=("Arial", 10, "bold"), fg="#334155").pack(pady=(10,0))
-                search_entry = tk.Entry(root, textvariable=search_var, font=("Arial", 12), relief="solid", borderwidth=1, justify="center")
-                search_entry.pack(fill="x", padx=30, pady=(5, 10))
-                
-                vars_dict = {}
-                checkbuttons_dict = {}
-                
-                btn_frame = tk.Frame(root, bg="#f8fafc")
-                btn_frame.pack(fill="x", padx=20, pady=5)
-                
-                def select_all():
-                    for v in vars_dict.values(): v.set(True)
-                def deselect_all():
-                    for v in vars_dict.values(): v.set(False)
-                    
-                tk.Button(btn_frame, text="☑ Select All", command=select_all, bg="#e2e8f0", fg="#334155", font=("Arial", 9, "bold"), relief="flat", cursor="hand2").pack(side="left", expand=True, fill="x", padx=(0, 5))
-                tk.Button(btn_frame, text="☐ Deselect All", command=deselect_all, bg="#e2e8f0", fg="#334155", font=("Arial", 9, "bold"), relief="flat", cursor="hand2").pack(side="right", expand=True, fill="x", padx=(5, 0))
-                
-                list_container = tk.Frame(root, bg="white", highlightbackground="#cbd5e1", highlightthickness=1)
-                list_container.pack(fill="both", expand=True, padx=20, pady=10)
-                
-                canvas = tk.Canvas(list_container, bg="white", highlightthickness=0)
-                scrollbar = tk.Scrollbar(list_container, orient="vertical", command=canvas.yview)
-                scrollable_frame = tk.Frame(canvas, bg="white")
-                
-                scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-                canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-                canvas.configure(yscrollcommand=scrollbar.set)
-                canvas.pack(side="left", fill="both", expand=True)
-                scrollbar.pack(side="right", fill="y")
-                
-                def _on_mousewheel(event):
-                    canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-                canvas.bind_all("<MouseWheel>", _on_mousewheel)
-                
-                row_idx = 0
-                for req in unique_reqs:
-                    var = tk.BooleanVar(value=True)
-                    vars_dict[req] = var
-                    
-                    jobs_list = master_info[req]
-                    jobs_str = ", ".join(jobs_list)
-                    if len(jobs_str) > 55: jobs_str = jobs_str[:52] + "..."
-                    
-                    display_text = f"📋 Req: {req}  ({len(jobs_list)} Jobs)\n     ↳ {jobs_str}"
-                    cb = tk.Checkbutton(scrollable_frame, text=display_text, variable=var, font=("Arial", 10), bg="white", fg="#0f172a", activebackground="white", cursor="hand2", justify="left")
-                    cb.grid(row=row_idx, column=0, sticky="w", padx=10, pady=5)
-                    
-                    checkbuttons_dict[req] = cb
-                    row_idx += 1
-                    
-                def filter_list(*args):
-                    term = search_var.get().lower().strip()
-                    for req, cb in checkbuttons_dict.items():
-                        if term in req.lower():
-                            cb.grid() 
-                        else:
-                            cb.grid_remove() 
-                            
-                search_var.trace("w", filter_list)
-                    
-                def on_submit():
-                    for r, v in vars_dict.items():
-                        if v.get(): selected_requests.append(r)
-                    canvas.unbind_all("<MouseWheel>")
-                    root.destroy()
-
-                # ========================================
-                # 🪄 NAYA LAB BUTTON (BINA EXE BADLE)
-                # ========================================
-                def open_lab_system():
-                    canvas.unbind_all("<MouseWheel>")
-                    root.destroy() 
-                    try:
-                        import cloud_lab as al 
-                    except:
-                        from modules import auto_lab as al
-                    al.launch_lab_generator_popup()
-
-                tk.Button(root, text="🧪 OPEN SMART LAB GENERATOR", command=open_lab_system, bg="#3b82f6", activebackground="#2563eb", fg="white", font=("Arial", 11, "bold"), cursor="hand2", pady=8).pack(fill="x", padx=20, pady=(0, 10))
-                # ========================================
-
-                tk.Button(root, text="⚡ START HUMANIZED FETCH", command=on_submit, bg="#10b981", activebackground="#059669", fg="white", activeforeground="white", font=("Arial", 11, "bold"), relief="flat", cursor="hand2", pady=8).pack(fill="x", padx=20, pady=(0, 20))
-                
-                search_entry.focus_set() 
-                root.mainloop()
-
-            show_popup() 
+            try:
+                print("📩 Calling JS Modal...")
+                eel.open_reception_selector_modal(unique_reqs, master_info)()
+                print("✅ Modal Signal Sent to Browser!")
+            except Exception as e:
+                return {"status": "error", "msg": f"UI Bridge Error: {e}"}
             
-            if not selected_requests:
-                return {"status": "error", "msg": "⚠️ Aapne koi Request No. select nahi kiya! Ya fir aap Lab Setup mein gaye hain."}
+            # 🚨 FIX: Hamesha ke liye wait nahi karega, 30 second baad timeout ho jayega
+            print("⏳ Waiting for user input in Modal...")
+            is_set = ui_event.wait(timeout=30) 
             
+            if not is_set:
+                return {"status": "error", "msg": "⚠️ Time out! Modal nahi khula ya user ne response nahi diya."}
+            
+            if not ui_selection:
+                return {"status": "error", "msg": "⚠️ User ne Cancel button dabaya ya selection null hai."}
+            
+            selected_requests = ui_selection
+            # ========================================
+            
+            # 🌟 NAYA CODE: Request Number aur Job Card ko ek sath map karke list me daalna
             job_cards_to_process = []
             for req in selected_requests:
-                job_cards_to_process.extend(master_info[req]) 
+                for jc in master_info[req]:
+                    job_cards_to_process.append({"req_no": req, "job_card": jc})
                 
-            print(f"📦 Arranged Jobs to Fetch: {job_cards_to_process}")
+            print(f"📦 Arranged Jobs to Fetch: {[j['job_card'] for j in job_cards_to_process]}")
             all_jobs_data = []
 
             # =======================================================
             # ⚡ STEP 5: ANTI-BOT HUMANIZED SCRAPING LOOP
             # =======================================================
-            for jc_no in job_cards_to_process:
-                print(f"⚡ Humanized Fetching: {jc_no}...")
+            for job_info in job_cards_to_process:
+                jc_no = job_info["job_card"]
+                req_no = job_info["req_no"]
+                
+                print(f"⚡ Humanized Fetching: {jc_no} (Req: {req_no})...")
                 try:
                     row_locator = list_page.locator(f"tr:has-text('{jc_no}')").first
                     action_link = row_locator.locator("a").last # Last action button pakdega
@@ -459,8 +384,9 @@ def _smart_scrape_logic():
                     
                     browser_context = list_page.context if hasattr(list_page, 'context') else list_page.page.context
                     
-                    with browser_context.expect_page(timeout=10000) as new_page_info:
-                        action_link.click(force=True)
+                    with browser_context.expect_page(timeout=15000) as new_page_info:
+                        # 🌟 FIX: Element not visible error ko bypass karne ke liye JAVASCRIPT Click!
+                        action_link.evaluate("node => node.click()")
                     
                     new_page = new_page_info.value
                     new_page.wait_for_load_state("domcontentloaded")
@@ -515,7 +441,8 @@ def _smart_scrape_logic():
                         time.sleep(0.2)  
                     
                     if items: 
-                        all_jobs_data.append({"job_card": jc_no, "items": items})
+                        # 🌟 NAYA CODE: Req No DB me bhejne ke liye add kiya
+                        all_jobs_data.append({"job_card": jc_no, "req_no": req_no, "items": items})
                         print(f"✅ Secure Grab: {len(items)} items from {jc_no}")
                         time.sleep(random.uniform(0.2, 0.5))
                     else:
@@ -528,11 +455,12 @@ def _smart_scrape_logic():
 
             if len(all_jobs_data) > 0:
                 try:
+                    # Backend data silent save for idx 1 to N
                     save_func = eel._exposed_functions.get('wait_for_job_card_and_save')
                     if save_func:
                         for idx in range(1, len(all_jobs_data)):
                             j_data = all_jobs_data[idx]
-                            info = {"type": "Job Card", "id": j_data["job_card"]}
+                            info = {"type": "Job Card", "id": j_data["job_card"], "req_no": j_data["req_no"]}
                             save_func(j_data["items"], info)
                 except Exception as e:
                     print("Silent DB Save Error:", e)
@@ -540,10 +468,12 @@ def _smart_scrape_logic():
                 first_job = all_jobs_data[0]
                 try: browser.disconnect()
                 except: pass
+                
+                # 🌟 NAYA CODE: Frontend ko bhi req_no bheja ja raha hai bundle karne ke liye
                 return {
                     "status": "success", 
                     "items": first_job["items"], 
-                    "extracted_info": {"type": "Job Card", "id": first_job["job_card"]}
+                    "extracted_info": {"type": "Job Card", "id": first_job["job_card"], "req_no": first_job["req_no"]}
                 }
             else:
                 return {"status": "error", "msg": "⚠️ Selected Requests ke tabs se koi data nahi mila!"}
@@ -551,30 +481,19 @@ def _smart_scrape_logic():
     except Exception as e: return {"status": "error", "msg": f"Script Error: {str(e)}"}
 
 # ==============================================================
-# 🚀 NAYA: GUARANTEED EVENT LOOP FIX (THREADING WRAPPER)
+# 🚀 NAYA: GUARANTEED EVENT LOOP FIX (THREAD-SAFE WRAPPER)
 # ==============================================================
+import concurrent.futures
+
 def smart_scrape_with_huid():
     print("🚀 THREAD-SAFE TURBO SCRAPER CALLED!")
-    result_box = []
-    
-    def runner():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            res = _smart_scrape_logic()
-            result_box.append(res)
-        except Exception as e:
-            result_box.append({"status": "error", "msg": f"Scraper Thread Error: {str(e)}"})
-        finally:
-            loop.close()
-            
-    t = threading.Thread(target=runner)
-    t.start()
-    t.join() 
-    
-    if result_box: return result_box[0]
-    return {"status": "error", "msg": "Unknown threading error."}
-
+    try:
+        # Yeh Playwright ko ekdum saaf aur nayi thread me chalayega, bina clash ke!
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(_smart_scrape_logic)
+            return future.result()
+    except Exception as e:
+        return {"status": "error", "msg": f"Thread Error: {str(e)}"}
 
 # ==============================================================
 # 6. WAIT FOR JOB CARD NO
