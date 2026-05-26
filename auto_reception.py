@@ -388,21 +388,27 @@ def scrape_all_requests_from_main():
 
             target_page = browser.contexts[0].pages[0] 
 
+            # 🛑 Naya Fix: Page load hone ka thoda wait karein taaki table UI par aa jaye
+            time.sleep(2.0)
+
+            # 🧠 Smart JavaScript logic jo pure text me se khud numbers extract karega
             js_code = """
             () => {
                 let results = {};
                 let rows = document.querySelectorAll('table tbody tr');
                 
                 for(let r of rows) {
-                    let cells = Array.from(r.querySelectorAll('td')).map(td => td.innerText.trim());
-                    let numbers = cells.filter(text => text.match(/^\\d{8,}$/));
+                    let rowText = r.innerText || "";
+                    // Sirf 8 ya usse bade numbers (Job Card aur Request No) dhundhega, chahe space kyu na ho
+                    let numbers = rowText.match(/\\b\\d{8,}\\b/g);
                     
-                    if (numbers.length >= 2) {
-                        let req = numbers[0]; 
-                        let job = numbers[1]; 
+                    if (numbers && numbers.length >= 2) {
+                        // Normally pehla Job Card hota hai, aur dusra Request No
+                        let job = numbers[0]; 
+                        let req = numbers[1]; 
                         if(!results[req]) results[req] = [];
                         if(!results[req].includes(job)) results[req].push(job);
-                    } else if (numbers.length === 1) {
+                    } else if (numbers && numbers.length === 1) {
                         let job = numbers[0];
                         let req = "UNKNOWN";
                         if(!results[req]) results[req] = [];
@@ -430,9 +436,9 @@ def scrape_all_requests_from_main():
                         for j in jobs:
                             if j not in all_data[req]: all_data[req].append(j)
 
-                previous_data_state = res # Current data ko save kar lo agli checking ke liye
+                previous_data_state = res 
                 
-                # Naya Check: '›' icon aur title attributes ke sath
+                # 'Next' Button Scanner
                 next_btn = target_page.locator("a.paginate_button.next, li.next a, a:has-text('Next'), a:has-text('›'), a[title*='Next']").last
                 
                 if next_btn.count() > 0:
@@ -442,7 +448,7 @@ def scrape_all_requests_from_main():
                     if not is_disabled:
                         print("➡️ Website ke agle panne (Next Page) par jaa rahe hain...")
                         next_btn.click(force=True)
-                        time.sleep(2.0) # Thoda extra time do page load hone ke liye
+                        time.sleep(2.0) # Page load hone ke liye delay
                     else:
                         break 
                 else:
