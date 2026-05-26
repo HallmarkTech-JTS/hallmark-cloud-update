@@ -59,7 +59,6 @@ def inject_single_reception_tag(job_id, tag_id, weight):
                 weight_input = target_row.locator("input.weightCls, input.scan-input, input[name='articlWeight'], input:not([type='hidden']):not([type='checkbox'])").first
                 
                 if weight_input.count() > 0:
-                    # 🚨 NEW BYPASS: No Click, No Keyboard. Direct Backend Injection!
                     js_inject = f"""node => {{
                         node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
                         node.removeAttribute('onpaste'); node.removeAttribute('oncopy'); 
@@ -121,7 +120,6 @@ def fast_inject_weight(job_id, tag_id, weight):
             if row.count() > 0:
                 weight_input = row.first.locator("input.weightCls, input.scan-input, input[name='articlWeight'], input:not([type='hidden']):not([type='checkbox'])").first
                 if weight_input.count() > 0:
-                    # 🚨 NEW BYPASS
                     js_inject = f"""node => {{
                         node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
                         node.removeAttribute('onpaste'); node.removeAttribute('oncopy'); 
@@ -205,7 +203,6 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
                         if weight_input.count() > 0:
                             current_val = str(weight_input.evaluate("node => node.value")).strip()
                             if current_val != weight:
-                                # 🚨 NEW BYPASS: Backend Data Injection Only
                                 js_inject = f"""node => {{
                                     node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
                                     node.removeAttribute('onpaste'); node.removeAttribute('oncopy'); 
@@ -233,7 +230,7 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
 
 
 # ==============================================================
-# 4. DATA SCRAPING & 5. WAIT FOR JOB CARD (Unchanged)
+# 4. DATA SCRAPING & 5. WAIT FOR JOB CARD
 # ==============================================================
 def extract_id_from_page(browser):
     js_code = """
@@ -303,7 +300,6 @@ def smart_scrape_with_huid():
             all_scraped_items = []
             target_frame = None
             
-            # 1. Pehle us frame ko dhoondo jisme table hai
             for page in browser.contexts[0].pages:
                 for frame in [page] + page.frames:
                     try:
@@ -314,32 +310,25 @@ def smart_scrape_with_huid():
                     except Exception: pass
                 if target_frame: break
 
-            # 2. Agar table mil gayi, toh 'Next' button dabane wala Loop chalao
             if target_frame:
-                previous_data = [] # Data repeat hone se bachane ke liye
+                previous_data = [] 
                 while True:
-                    # Current page ka data nikalo
                     res = target_frame.evaluate(js_code)
-                    
-                    # Naya data apne main dibbe me dalo (Bina duplicate ke)
                     if res and len(res) > 0 and res != previous_data:
                         for item in res:
                             if item not in all_scraped_items:
                                 all_scraped_items.append(item)
                         previous_data = res
                     
-                    # Next button check karo
                     next_btn = target_frame.locator("a#tab_logic_next")
                     if next_btn.count() > 0:
                         btn_class = next_btn.get_attribute("class") or ""
                         if "disabled" in btn_class:
-                            break # 🚨 Aakhiri page aa gaya, loop khatam!
-                        
-                        print(f"➡️ Page Load ho raha hai... (Abhi tak {len(all_scraped_items)} items mile)")
+                            break 
                         next_btn.click()
-                        time.sleep(1.5) # Naya data aane ka wait (Zaroori hai)
+                        time.sleep(1.5) 
                     else:
-                        break # Agar Next button hai hi nahi toh ruk jao
+                        break 
             
             scraped_items = all_scraped_items 
             try: browser.disconnect()
@@ -371,23 +360,20 @@ def wait_for_job_card_no():
             if not job_card_no: return {"status": "error", "msg": "⚠️ Time out!"}
             return {"status": "success", "job_card": job_card_no}
     except Exception as e: return {"status": "error", "msg": str(e)}
+
 # ==============================================================
 # 🌟 NAYA FEATURE: 100% LIVE WEB SCRAPING & TAB MANAGEMENT
 # ==============================================================
-
 def scrape_all_requests_from_main():
     """Main page par sabhi pages ko (Next click karke) padhna aur Request/Job list banana"""
     print("🌐 Website ke Main Dashboard se data fetch kar rahe hain...")
     try:
-        from playwright.sync_api import sync_playwright
         with sync_playwright() as p:
             try: browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
             except: return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
 
-            # Main panna pakadna
             target_page = browser.contexts[0].pages[0] 
 
-            # Javascript jo website ke table se Request No. aur Job Card No. nikalega
             js_code = """
             () => {
                 let results = {};
@@ -395,12 +381,11 @@ def scrape_all_requests_from_main():
                 
                 for(let r of rows) {
                     let cells = Array.from(r.querySelectorAll('td')).map(td => td.innerText.trim());
-                    // 8 ya usse zyada digit wale numbers dhundho (Request aur Job yahi hote hain)
                     let numbers = cells.filter(text => text.match(/^\\d{8,}$/));
                     
                     if (numbers.length >= 2) {
-                        let req = numbers[0]; // Pehla number Request
-                        let job = numbers[1]; // Dusra number Job Card
+                        let req = numbers[0]; 
+                        let job = numbers[1]; 
                         if(!results[req]) results[req] = [];
                         if(!results[req].includes(job)) results[req].push(job);
                     } else if (numbers.length === 1) {
@@ -416,7 +401,6 @@ def scrape_all_requests_from_main():
 
             all_data = {}
             while True:
-                # Page se data padho
                 res = target_page.evaluate(js_code)
                 if res:
                     for req, jobs in res.items():
@@ -424,14 +408,13 @@ def scrape_all_requests_from_main():
                         for j in jobs:
                             if j not in all_data[req]: all_data[req].append(j)
 
-                # Website par 'Next' button check karo aur click karo
                 next_btn = target_page.locator("a.paginate_button.next, button.next, a:has-text('Next')").last
                 if next_btn.count() > 0 and "disabled" not in (next_btn.get_attribute("class") or ""):
                     print("➡️ Website ke agle panne (Next Page) par jaa rahe hain...")
                     next_btn.click()
-                    time.sleep(1.5) # Website ko load hone ka time dena zaruri hai
+                    time.sleep(1.5) 
                 else:
-                    break # Saare panne khatam
+                    break 
 
             try: browser.disconnect()
             except: pass
@@ -444,13 +427,11 @@ def scrape_all_requests_from_main():
 
 
 def process_selected_requests(selected_reqs, master_info):
-    """Website par QM View kholna, Tag/Purity nikalna, aur tab band karna"""
+    """Website par QM View kholna, Tag/Purity nikalna, aur tab band karna (With Autonomous Pagination)"""
     print(f"🌐 Website par selected requests ki scraping shuru: {selected_reqs}")
     from modules import database as db
-    import re
     
     try:
-        from playwright.sync_api import sync_playwright
         with sync_playwright() as p:
             browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
             context = browser.contexts[0]
@@ -463,34 +444,51 @@ def process_selected_requests(selected_reqs, master_info):
                 for job in jobs:
                     print(f"🔍 Website par Job dhundh rahe hain: {job}")
 
-                    # 1. Main page ke search box me Job Card dalna
+                    # 🛡️ PROBLEM 1 SOLVED: Search box clear karke global pagination scan loop chalana
                     search_box = main_page.locator("input[type='search']").first
                     if search_box.count() > 0:
-                        search_box.fill(job)
-                        time.sleep(1.5) 
+                        search_box.fill("")
+                        time.sleep(0.5)
 
-                    # 2. Table me wo row dhundhna
-                    row = main_page.locator(f"tr", has_text=job).first
-                    if row.count() == 0:
-                        print(f"⚠️ Website par Job {job} nahi mila.")
+                    # Har baar scan karne se pehle hamesha Page 1 par reset karein
+                    try:
+                        main_page.evaluate('() => { let f = document.querySelector(".paginate_button.first, a:has-text(\\"First\\")"); if(f) f.click(); }')
+                        time.sleep(1.0)
+                    except: pass
+
+                    row = None
+                    # Autonomous loop jab tak target page par job na mil jaye (e.g. Page 4)
+                    while True:
+                        row_match = main_page.locator("tr", has_text=job).first
+                        if row_match.count() > 0 and row_match.is_visible():
+                            row = row_match
+                            break
+                        
+                        # Agar is panne par nahi mila, toh next panna click karein
+                        next_btn = main_page.locator("a.paginate_button.next, button.next, a:has-text('Next')").last
+                        if next_btn.count() > 0 and "disabled" not in (next_btn.get_attribute("class") or ""):
+                            print(f"➡️ Job {job} is page par nahi mila, clicking Next Dashboard Page...")
+                            next_btn.click()
+                            time.sleep(1.5)
+                        else:
+                            break  # Saare panne scan ho gaye aur nahi mila
+
+                    if not row:
+                        print(f"⚠️ Website par pure navigation ke baad bhi Job {job} nahi mila.")
                         continue
 
-                    # 3. Row ke andar "QM View" ya aakhiri link (Action button) ko dhundhna
                     view_btn = row.locator("a").last 
 
                     try:
-                        # 4. Button click karke NAYA PAGE (TAB) khulne ka wait karna
                         with context.expect_page(timeout=10000) as new_page_info:
                             view_btn.click()
                         new_page = new_page_info.value
                         new_page.wait_for_load_state("networkidle")
-                        time.sleep(2) # Naya tab load hone do
+                        time.sleep(2) 
                     except Exception as e:
                         print(f"⚠️ Naya tab kholne me dikkat: {e}")
                         continue
 
-                    # --- NAYA TAB KHUL GAYA (Yahan aapki image wala page aayega) ---
-                    # 5. Naye page par saara data (Tags, Category, Purity) padhna
                     js_code_tags = """
                     () => {
                         let results = [];
@@ -528,39 +526,29 @@ def process_selected_requests(selected_reqs, master_info):
 
                     all_scraped_items = []
                     while True:
-                        # Tab se data lo
                         res = new_page.evaluate(js_code_tags)
                         if res and len(res) > 0:
                             for item in res:
                                 if item not in all_scraped_items:
                                     all_scraped_items.append(item)
 
-                        # Naye tab mein 'Next' dabao jab tak disable na ho jaye
                         next_btn = new_page.locator("a#tab_logic_next, a.paginate_button.next").last
                         if next_btn.count() > 0 and "disabled" not in (next_btn.get_attribute("class") or ""):
                             next_btn.click()
                             time.sleep(1.5)
                         else:
-                            break # Naye tab ke saare panne padh liye
+                            break 
 
                     print(f"✅ Website se {len(all_scraped_items)} tags fetch kiye.")
 
-                    # 6. SABSE ZARURI: Naya tab band karna taaki confusion na ho
                     try: new_page.close()
                     except: pass
 
-                    # 7. Ab data database mein save karna (kyunki website ka kaam khatam)
                     if all_scraped_items:
                         db.save_scraped_job_card(job, all_scraped_items, request_no=req)
                         total_jobs_saved += 1
 
-                    # Wapas Main page par focus lana
                     main_page.bring_to_front()
-
-                    # Main page ka search box khaali karna agle Job ke liye
-                    if search_box.count() > 0:
-                        search_box.fill("")
-                        time.sleep(0.5)
 
             try: browser.disconnect()
             except: pass
