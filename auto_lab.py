@@ -129,43 +129,40 @@ def inject_lab_weight_ghost(lab_data=None):
 
             bis_page.on("dialog", lambda dialog: dialog.accept())
 
-            def human_type_and_save(selector_id, value, save_btn_index, step_name):
-                val_str = str(value).strip()
-                if val_str and val_str not in ["", "None"]:
-                    try:
-                        box = bis_page.locator(selector_id).first
-                        if box.count() > 0:
-                            current_val = str(box.evaluate("node => node.value")).strip()
-                            is_match = False
-                            try:
-                                if float(current_val) == float(val_str): is_match = True
-                            except ValueError:
-                                if current_val == val_str: is_match = True
+            # ---------------------------------------------------------
+            # 🚀 NEW PM FIX: PRE-INJECTION SEQUENCE (Master Weights)
+            # ---------------------------------------------------------
+            try:
+                if sample_wt and str(sample_wt) not in ["0", "0.0", "", "None"]:
+                    print(f"⚖️ Injecting Sample Drawn Weight: {sample_wt}")
+                    sample_input = bis_page.locator("div").filter(has_text="Sample Drawn Weight").locator("input[type='text'], input[type='number']").first
+                    if sample_input.count() > 0:
+                        sample_input.evaluate("node => { node.removeAttribute('disabled'); node.removeAttribute('readonly'); }")
+                        sample_input.fill(str(sample_wt))
+                        time.sleep(0.5)
+                        
+                        sample_save_btn = bis_page.locator("div").filter(has_text="Sample Drawn Weight").locator("button, a, input[type='button']").filter(has_text="Save").first
+                        if sample_save_btn.count() > 0:
+                            sample_save_btn.click(force=True)
+                            print("✅ Sample Drawn Weight Saved!")
+                            time.sleep(1.5) # Server process hone ka wait
 
-                            if is_match:
-                                print(f"⏩ SMART SKIP: {step_name} pehle se bhara hai! ⚡")
-                                return 
-
-                            print(f"⏳ Typing {step_name}: {val_str}")
-                            box.evaluate("node => { node.removeAttribute('disabled'); node.removeAttribute('readonly'); }")
-                            box.clear()
-                            
-                            bis_page.wait_for_timeout(random.randint(100, 200)) 
-                            box.type(val_str, delay=random.randint(50, 100))    
-                            bis_page.wait_for_timeout(random.randint(200, 400))
-                            
-                            save_btns = bis_page.locator("button:has-text('Save')")
-                            if save_btns.count() > save_btn_index:
-                                save_btns.nth(save_btn_index).click(force=True) 
-                                print(f"✅ Clicked Save for {step_name}")
-                                bis_page.wait_for_timeout(random.randint(1500, 2000)) 
-                        else:
-                            print(f"❌ ERROR: {step_name} ka box nahi mila!")
-                    except Exception as e:
-                        print(f"⚠️ {step_name} Error: {e}")
-
-            human_type_and_save("#num_scrap_weight", sample_wt, 0, "Sample Weight")
-            human_type_and_save("#buttonweight", button_wt, 1, "Button Weight")
+                if button_wt and str(button_wt) not in ["0", "0.0", "", "None"]:
+                    print(f"⚖️ Injecting Button Weight: {button_wt}")
+                    button_input = bis_page.locator("div").filter(has_text="Button Weight").locator("input[type='text'], input[type='number']").first
+                    if button_input.count() > 0:
+                        button_input.evaluate("node => { node.removeAttribute('disabled'); node.removeAttribute('readonly'); }")
+                        button_input.fill(str(button_wt))
+                        time.sleep(0.5)
+                        
+                        button_save_btn = bis_page.locator("div").filter(has_text="Button Weight").locator("button, a, input[type='button']").filter(has_text="Save").first
+                        if button_save_btn.count() > 0:
+                            button_save_btn.click(force=True)
+                            print("✅ Button Weight Saved!")
+                            time.sleep(1.5) # Server process hone ka wait
+            except Exception as e:
+                print(f"⚠️ Pre-Injection Warning: {e}")
+            # ---------------------------------------------------------
 
             filled_count = 0
             global_phase = 1
