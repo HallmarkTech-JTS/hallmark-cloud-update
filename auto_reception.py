@@ -485,12 +485,42 @@ def process_selected_requests(selected_reqs, master_info):
                     search_box = main_page.locator("input[type='search']").first
                     if search_box.count() > 0:
                         search_box.fill(job)
+                        search_box.press("Enter") # Naya feature: Force search by pressing Enter
                         time.sleep(1.5) 
 
-                    row = main_page.locator("tr", has_text=job).first
-                    if row.count() == 0:
-                        print(f"⚠️ Website par Job {job} nahi mila.")
-                        continue
+                    job_found = False
+                    row = None
+                    
+                    # 🚀 SMART PAGE SCANNER: Har page par job dhundhega
+                    while True:
+                        row = main_page.locator("tr", has_text=job).first
+                        
+                        if row.count() > 0:
+                            job_found = True
+                            break # Job mil gaya! Loop rok do.
+                            
+                        # Agar current page par nahi mila, toh 'Next' button check karo
+                        next_btn = main_page.locator("a.paginate_button.next, li.next a, a:has-text('Next'), a:has-text('›'), a[title*='Next']").last
+                        
+                        if next_btn.count() > 0:
+                            btn_class = next_btn.get_attribute("class") or ""
+                            is_disabled = "disabled" in btn_class or next_btn.get_attribute("aria-disabled") == "true" or next_btn.get_attribute("disabled") is not None
+                            
+                            if not is_disabled:
+                                print(f"➡️ Page par nahi mila, agla page scan kar rahe hain...")
+                                next_btn.click(force=True)
+                                time.sleep(1.5) # Naya page load hone ka wait
+                            else:
+                                break # Hum aakhri page par aa gaye hain
+                        else:
+                            break # Next button hi nahi hai
+                            
+                    if not job_found:
+                        print(f"⚠️ Alert: Poori website scan ki, par Job {job} nahi mila.")
+                        if search_box.count() > 0:
+                            search_box.fill("")
+                            time.sleep(0.5)
+                        continue # Agle job par badh jao
 
                     view_btn = row.locator("a").last 
 
@@ -584,6 +614,17 @@ def process_selected_requests(selected_reqs, master_info):
                     if search_box.count() > 0:
                         search_box.fill("")
                         time.sleep(0.5)
+                        
+                    # 🔄 Naya feature: Agle job ke search ke liye wapas 'First' page par aa jao
+                    try:
+                        first_btn = main_page.locator("a.paginate_button.first, li.first a, a:has-text('First'), a:has-text('«'), a[title*='First']").last
+                        if first_btn.count() > 0:
+                            f_class = first_btn.get_attribute("class") or ""
+                            if "disabled" not in f_class:
+                                first_btn.click(force=True)
+                                time.sleep(1.0)
+                    except: 
+                        pass
 
             try: browser.disconnect()
             except: pass
