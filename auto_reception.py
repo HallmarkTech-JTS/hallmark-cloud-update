@@ -490,16 +490,34 @@ def process_selected_requests(selected_reqs, master_info):
                 for job in jobs:
                     print(f"🔍 Website par Job dhundh rahe hain: {job}")
 
-                    # 🛑 FIX: Search box zaroori nahi hai! Sirf table wala frame dhundho.
+                    time.sleep(1.0) # 🛑 FIX: Thoda delay taaki naya tab close hone ke baad DOM stable ho jaye
+
+                    # 🕵️‍♂️ SMART FRAME FINDER (Ab hum Playwright ki jagah JavaScript se dhundhenge)
                     target_frame = None
                     for frame in [main_page] + main_page.frames:
                         try:
-                            # Agar frame mein table hai, toh yahi humara target hai
-                            if frame.locator("table tbody tr").count() > 0:
+                            # Hum wahi robust 8-digit match logic lagayenge yahan bhi
+                            has_data = frame.evaluate('''() => {
+                                let rows = document.querySelectorAll('table tbody tr');
+                                for(let r of rows) {
+                                    if ((r.innerText || "").match(/\\b\\d{8,}\\b/)) return true;
+                                }
+                                return false;
+                            }''')
+                            if has_data:
                                 target_frame = frame
                                 break
                         except: pass
                         
+                    # Backup plan: Agar 8-digit nahi mile (jaise khali table), toh koi bhi existing table le lo
+                    if not target_frame:
+                        for frame in [main_page] + main_page.frames:
+                            try:
+                                if frame.evaluate("() => document.querySelectorAll('table tbody tr').length") > 0:
+                                    target_frame = frame
+                                    break
+                            except: pass
+
                     if not target_frame:
                         print(f"⚠️ Error: Table frame nahi mila.")
                         continue 
@@ -511,21 +529,22 @@ def process_selected_requests(selected_reqs, master_info):
                             f_class = first_btn.get_attribute("class") or ""
                             if "disabled" not in f_class:
                                 first_btn.click(force=True)
-                                time.sleep(1.0)
+                                time.sleep(2.0) # Page 1 reload hone ka pakka wait
                     except: pass
 
-                    # 🔍 OPTIONAL: Agar search box hai toh use karo, warna koi baat nahi
+                    # 🔍 OPTIONAL: Agar search box hai toh use karo, warna directly list scan karega
                     search_box = target_frame.locator("input[type='search'], input.form-control.input-sm").first
                     if search_box.count() > 0:
                         try:
                             search_box.fill(job)
-                            time.sleep(1.0) 
+                            search_box.press("Enter") # Search ke baad enter button zaroori hai
+                            time.sleep(1.5) 
                         except: pass
 
                     job_found = False
                     row = None
                     
-                    # 🚀 SMART PAGE SCANNER (Bina Search box ke bhi kaam karega)
+                    # 🚀 SMART PAGE SCANNER
                     while True:
                         row = target_frame.locator("tr", has_text=job).first
                         
@@ -553,7 +572,7 @@ def process_selected_requests(selected_reqs, master_info):
                             except: pass
                         continue 
 
-                    # 👁️ View Button par click karna
+                    # 👁️ View Button click karo
                     view_btn = row.locator("a").last 
 
                     try:
@@ -561,7 +580,7 @@ def process_selected_requests(selected_reqs, master_info):
                             view_btn.click(force=True)
                         new_page = new_page_info.value
                         new_page.wait_for_load_state("networkidle")
-                        time.sleep(2) 
+                        time.sleep(2.0) # Naya tab load hone do
                     except Exception as e:
                         print(f"⚠️ Naya tab kholne me dikkat: {e}")
                         continue
