@@ -375,6 +375,7 @@ def wait_for_job_card_no():
             return {"status": "success", "job_card": job_card_no}
     except Exception as e: return {"status": "error", "msg": str(e)}
 
+
 # ==============================================================
 # 🌟 NAYA FEATURE: 100% LIVE WEB SCRAPING & TAB MANAGEMENT
 # ==============================================================
@@ -386,46 +387,63 @@ def scrape_all_requests_from_main():
             try: browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
             except: return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
 
-            target_page = browser.contexts[0].pages[0] 
-
-            # 🛑 Naya Fix: Page load hone ka thoda wait karein taaki table UI par aa jaye
-            time.sleep(2.0)
-
-            # 🧠 Smart JavaScript logic jo pure text me se khud numbers extract karega
+            # 🧠 Smart JavaScript: Jo kisi bhi table se 8+ digit ke number nikal lega
             js_code = """
             () => {
                 let results = {};
                 let rows = document.querySelectorAll('table tbody tr');
+                if(rows.length === 0) return null; // Agar frame me table nahi hai toh aage badho
                 
+                let hasData = false;
                 for(let r of rows) {
                     let rowText = r.innerText || "";
-                    // Sirf 8 ya usse bade numbers (Job Card aur Request No) dhundhega, chahe space kyu na ho
                     let numbers = rowText.match(/\\b\\d{8,}\\b/g);
                     
                     if (numbers && numbers.length >= 2) {
-                        // Normally pehla Job Card hota hai, aur dusra Request No
-                        let job = numbers[0]; 
-                        let req = numbers[1]; 
+                        let req = numbers[0]; 
+                        let job = numbers[1]; 
                         if(!results[req]) results[req] = [];
                         if(!results[req].includes(job)) results[req].push(job);
+                        hasData = true;
                     } else if (numbers && numbers.length === 1) {
                         let job = numbers[0];
                         let req = "UNKNOWN";
                         if(!results[req]) results[req] = [];
                         if(!results[req].includes(job)) results[req].push(job);
+                        hasData = true;
                     }
                 }
-                return results;
+                return hasData ? results : null;
             }
             """
 
+            time.sleep(2.0) # Page render hone ke liye zaroori wait
+            
+            target_frame = None
+            
+            # 🕵️‍♂️ IFRAME SCANNER: Website ke har page aur har frame me table dhundho
+            for page in browser.contexts[0].pages:
+                for frame in [page] + page.frames:
+                    try:
+                        res = frame.evaluate(js_code)
+                        if res: 
+                            target_frame = frame
+                            break
+                    except: pass
+                if target_frame: break
+
+            if not target_frame:
+                try: browser.disconnect()
+                except: pass
+                return {"status": "error", "msg": "⚠️ Website par koi Request/Job Data nahi mila! (Table not found)"}
+
             all_data = {}
-            previous_data_state = None # Pichle page ka data yaad rakhne ke liye
+            previous_data_state = None 
 
             while True:
-                res = target_page.evaluate(js_code)
+                # Ab hum exactly usi frame se data nikalenge jisme table mili thi
+                res = target_frame.evaluate(js_code)
                 
-                # Check agar data update nahi hua (matlab next page load nahi hua)
                 if res == previous_data_state:
                     print("🛑 Aakhri page aa gaya (Data repeat ho raha hai). Loop break kar rahe hain.")
                     break
@@ -438,8 +456,8 @@ def scrape_all_requests_from_main():
 
                 previous_data_state = res 
                 
-                # 'Next' Button Scanner
-                next_btn = target_page.locator("a.paginate_button.next, li.next a, a:has-text('Next'), a:has-text('›'), a[title*='Next']").last
+                # Next button bhi usi frame me dhundhenge
+                next_btn = target_frame.locator("a.paginate_button.next, li.next a, a:has-text('Next'), a:has-text('›'), a[title*='Next']").last
                 
                 if next_btn.count() > 0:
                     btn_class = next_btn.get_attribute("class") or ""
@@ -448,7 +466,7 @@ def scrape_all_requests_from_main():
                     if not is_disabled:
                         print("➡️ Website ke agle panne (Next Page) par jaa rahe hain...")
                         next_btn.click(force=True)
-                        time.sleep(2.0) # Page load hone ke liye delay
+                        time.sleep(2.0) 
                     else:
                         break 
                 else:
@@ -457,10 +475,8 @@ def scrape_all_requests_from_main():
             try: browser.disconnect()
             except: pass
 
-            if not all_data:
-                return {"status": "error", "msg": "⚠️ Website par koi Request/Job Data nahi mila!"}
-
             return {"status": "success", "data": all_data}
+            
     except Exception as e: return {"status": "error", "msg": str(e)}
 
 
@@ -475,12 +491,6 @@ def process_selected_requests(selected_reqs, master_info):
             context = browser.contexts[0]
             main_page = context.pages[0]
 
-            # 🛡️ QA FIX: Reset main dashboard to first page before query loops to prevent offset isolation
-            try:
-                main_page.evaluate('() => { let f = document.querySelector(".paginate_button.first, a:has-text(\\"First\\")"); if(f) f.click(); }')
-                time.sleep(1.0)
-            except: pass
-
             total_jobs_saved = 0
 
             for req in selected_reqs:
@@ -488,57 +498,88 @@ def process_selected_requests(selected_reqs, master_info):
                 for job in jobs:
                     print(f"🔍 Website par Job dhundh rahe hain: {job}")
 
-                    search_box = main_page.locator("input[type='search']").first
-                    if search_box.count() > 0:
-                        search_box.fill(job)
-                        search_box.press("Enter") # Naya feature: Force search by pressing Enter
-                        time.sleep(1.5) 
+                    # 🕵️‍♂️ SMART FRAME FINDER: Search box kis iframe me hai, wo dhundho
+                    target_frame = None
+                    for frame in [main_page] + main_page.frames:
+                        try:
+                            if frame.locator("input[type='search']").count() > 0:
+                                target_frame = frame
+                                break
+                        except: pass
+                        
+                    if not target_frame:
+                        print(f"⚠️ Error: Website par Search Box nahi mila! (Iframe error)")
+                        continue # Agle job par jao
+
+                    # 🔄 QA FIX: Naya job dhundhne se pehle wapas 'First' page par aao
+                    try:
+                        first_btn = target_frame.locator("a.paginate_button.first, li.first a, a:has-text('First'), a:has-text('«'), a[title*='First']").last
+                        if first_btn.count() > 0:
+                            f_class = first_btn.get_attribute("class") or ""
+                            if "disabled" not in f_class:
+                                first_btn.click(force=True)
+                                time.sleep(1.0)
+                    except: pass
+
+                    search_box = target_frame.locator("input[type='search']").first
+                    search_box.fill(job)
+                    search_box.press("Enter") # Enter press karna zaroori hai
+                    time.sleep(1.5) 
 
                     job_found = False
                     row = None
                     
-                    # 🚀 SMART PAGE SCANNER: Har page par job dhundhega
+                    # 🚀 SMART PAGE SCANNER (Iframe ke andar Next page scan karega)
                     while True:
-                        row = main_page.locator("tr", has_text=job).first
+                        row = target_frame.locator("tr", has_text=job).first
                         
                         if row.count() > 0:
                             job_found = True
-                            break # Job mil gaya! Loop rok do.
+                            break 
                             
-                        # Agar current page par nahi mila, toh 'Next' button check karo
-                        next_btn = main_page.locator("a.paginate_button.next, li.next a, a:has-text('Next'), a:has-text('›'), a[title*='Next']").last
+                        next_btn = target_frame.locator("a.paginate_button.next, li.next a, a:has-text('Next'), a:has-text('›'), a[title*='Next']").last
                         
                         if next_btn.count() > 0:
                             btn_class = next_btn.get_attribute("class") or ""
-                            is_disabled = "disabled" in btn_class or next_btn.get_attribute("aria-disabled") == "true" or next_btn.get_attribute("disabled") is not None
-                            
-                            if not is_disabled:
+                            if "disabled" not in btn_class:
                                 print(f"➡️ Page par nahi mila, agla page scan kar rahe hain...")
                                 next_btn.click(force=True)
-                                time.sleep(1.5) # Naya page load hone ka wait
+                                time.sleep(1.5)
                             else:
-                                break # Hum aakhri page par aa gaye hain
+                                break
                         else:
-                            break # Next button hi nahi hai
+                            break
                             
                     if not job_found:
                         print(f"⚠️ Alert: Poori website scan ki, par Job {job} nahi mila.")
-                        if search_box.count() > 0:
-                            search_box.fill("")
-                            time.sleep(0.5)
-                        continue # Agle job par badh jao
+                        search_box.fill("")
+                        time.sleep(0.5)
+                        continue 
 
                     view_btn = row.locator("a").last 
 
                     try:
                         with context.expect_page(timeout=10000) as new_page_info:
-                            view_btn.click()
+                            view_btn.click(force=True)
                         new_page = new_page_info.value
                         new_page.wait_for_load_state("networkidle")
                         time.sleep(2) 
                     except Exception as e:
                         print(f"⚠️ Naya tab kholne me dikkat: {e}")
                         continue
+
+                    # 🕵️‍♂️ NAYE TAB MEIN BHI IFRAME CHECK (Agar tag list iframe me ho)
+                    target_new_frame = None
+                    for frame in [new_page] + new_page.frames:
+                        try:
+                            # Check karte hain ki kya is frame me 'TAG ID' likha hai
+                            if "TAG ID" in frame.locator("body").inner_text().upper():
+                                target_new_frame = frame
+                                break
+                        except: pass
+                        
+                    if not target_new_frame: 
+                        target_new_frame = new_page # Fallback
 
                     js_code_tags = """
                     () => {
@@ -579,7 +620,7 @@ def process_selected_requests(selected_reqs, master_info):
                     previous_page_data = None
                     
                     while True:
-                        res = new_page.evaluate(js_code_tags)
+                        res = target_new_frame.evaluate(js_code_tags)
                         
                         if res == previous_page_data:
                             break
@@ -591,14 +632,11 @@ def process_selected_requests(selected_reqs, master_info):
                                     
                         previous_page_data = res
 
-                        # Naya Check yahan bhi lagaya gaya hai
-                        next_btn = new_page.locator("a#tab_logic_next, a.paginate_button.next, li.next a, a:has-text('Next'), a:has-text('›'), a[title*='Next']").last
+                        next_btn = target_new_frame.locator("a#tab_logic_next, a.paginate_button.next, li.next a, a:has-text('Next'), a:has-text('›'), a[title*='Next']").last
                         
                         if next_btn.count() > 0:
                             btn_class = next_btn.get_attribute("class") or ""
-                            is_disabled = "disabled" in btn_class or next_btn.get_attribute("aria-disabled") == "true" or next_btn.get_attribute("disabled") is not None
-                            
-                            if not is_disabled:
+                            if "disabled" not in btn_class and next_btn.get_attribute("aria-disabled") != "true":
                                 next_btn.click(force=True)
                                 time.sleep(1.5)
                             else:
@@ -620,17 +658,6 @@ def process_selected_requests(selected_reqs, master_info):
                     if search_box.count() > 0:
                         search_box.fill("")
                         time.sleep(0.5)
-                        
-                    # 🔄 Naya feature: Agle job ke search ke liye wapas 'First' page par aa jao
-                    try:
-                        first_btn = main_page.locator("a.paginate_button.first, li.first a, a:has-text('First'), a:has-text('«'), a[title*='First']").last
-                        if first_btn.count() > 0:
-                            f_class = first_btn.get_attribute("class") or ""
-                            if "disabled" not in f_class:
-                                first_btn.click(force=True)
-                                time.sleep(1.0)
-                    except: 
-                        pass
 
             try: browser.disconnect()
             except: pass
