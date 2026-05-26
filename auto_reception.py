@@ -1,37 +1,69 @@
-from playwright.sync_api import sync_playwright
 import time
 import re
-import eel  
 import random
 import queue
 import concurrent.futures
+import logging
+import eel
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
-# 🌟 NAYA: Web UI ke liye global Queue (Hang hone se bachane ke liye)
+# ==============================================================
+# 🛡️ ENTERPRISE LOGGING SETUP (For Client Bug Tracking)
+# ==============================================================
+logging.basicConfig(
+    filename='reception_engine.log', 
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# 🌟 Web UI ke liye global Queue (Hang hone se bachane ke liye)
 ui_queue = queue.Queue()
 
-# Playwright ke liye local browser ka URL
+# Playwright ke liye local secure browser ka URL
 CDP_URL = "http://localhost:9222"
+
+# ==============================================================
+# 🛑 JAVASCRIPT RULE BREAKER (Master DOM Injector)
+# ==============================================================
+def get_force_inject_js(weight_value):
+    """Generates JS payload to break disabled/readonly rules and force input"""
+    return f"""node => {{
+        try {{
+            node.removeAttribute('disabled'); 
+            node.removeAttribute('readonly'); 
+            node.value = '{weight_value}'; 
+            node.dispatchEvent(new Event('input', {{ bubbles: true }}));
+            node.dispatchEvent(new Event('change', {{ bubbles: true }}));
+            node.dispatchEvent(new KeyboardEvent('keyup', {{ bubbles: true, key: 'Enter' }}));
+            node.dispatchEvent(new Event('blur', {{ bubbles: true }}));
+        }} catch(e) {{ console.error("Force inject failed:", e); }}
+    }}"""
 
 # ==============================================================
 # 1. SINGLE RECEPTION INJECTION (Manual Table Button Se)
 # ==============================================================
 def inject_single_reception_tag(job_id, tag_id, weight):
     tag_id, weight = str(tag_id).strip(), str(weight).strip()
-    print(f"👻 Live Injecting Tag: {tag_id} | Weight: {weight}g | Job: {job_id}")
+    logger.info(f"Live Injecting Tag: {tag_id} | Weight: {weight}g | Job: {job_id}")
+    
     try:
         with sync_playwright() as p:
-            try: browser = p.chromium.connect_over_cdp(CDP_URL)
-            except: return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
+            try: 
+                browser = p.chromium.connect_over_cdp(CDP_URL, timeout=10000)
+            except Exception as e: 
+                logger.error(f"Browser Connect Error: {e}")
+                return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
             
             job_matched = False
             for page in browser.contexts[0].pages:
                 try:
-                    text = page.locator("body").inner_text()
+                    text = page.locator("body").inner_text(timeout=2000)
                     if job_id in text: job_matched = True; break
                 except: pass
                 for frame in page.frames:
                     try:
-                        if job_id in frame.locator("body").inner_text(): job_matched = True; break
+                        if job_id in frame.locator("body").inner_text(timeout=2000): job_matched = True; break
                     except: pass
                 if job_matched: break
                 
@@ -65,17 +97,10 @@ def inject_single_reception_tag(job_id, tag_id, weight):
                 weight_input = target_row.locator("input.weightCls, input.scan-input, input[name='articlWeight'], input:not([type='hidden']):not([type='checkbox'])").first
                 
                 if weight_input.count() > 0:
-                    # NORMAL SPEED (Humanized) for Injection - Aapka Code
-                    js_enable = """node => {
-                        node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
-                    }"""
-                    weight_input.evaluate(js_enable)
-                    weight_input.focus()
-                    weight_input.fill("")
-                    time.sleep(random.uniform(0.1, 0.2)) 
-                    weight_input.type(weight, delay=random.randint(30, 80)) 
-                    
-                    weight_input.evaluate("node => { node.dispatchEvent(new Event('input', { bubbles: true })); node.dispatchEvent(new Event('change', { bubbles: true })); }")
+                    # 🚀 APPLYING THE RULE BREAKER
+                    js_payload = get_force_inject_js(weight)
+                    weight_input.evaluate(js_payload)
+                    time.sleep(random.uniform(0.3, 0.6)) 
                     
                     save_btn = target_row.locator("text='Save'").first
                     if save_btn.is_visible():
@@ -87,22 +112,28 @@ def inject_single_reception_tag(job_id, tag_id, weight):
                         
                     try: browser.disconnect()
                     except: pass
+                    logger.info(f"Success: Tag '{tag_id}' Saved")
                     return {"status": "success", "msg": f"✅ Tag '{tag_id}' Saved ({weight}g)"}
-                else: return {"status": "error", "msg": "⚠️ Input box nahi mila!"}
-            else: return {"status": "error", "msg": f"⚠️ Tag '{tag_id}' Editable list me nahi mila."}
-    except Exception as e: return {"status": "error", "msg": f"⚠️ Error: {str(e)}"}
-
+                else: 
+                    return {"status": "error", "msg": "⚠️ Input box nahi mila!"}
+            else: 
+                return {"status": "error", "msg": f"⚠️ Tag '{tag_id}' Editable list me nahi mila."}
+    except Exception as e: 
+        logger.error(f"Single Inject Exception: {str(e)}")
+        return {"status": "error", "msg": f"⚠️ Error: {str(e)}"}
 
 # ==============================================================
-# 2. FAST DROPDOWN INJECTION 
+# 2. FAST DROPDOWN INJECTION (Full Original Structure Restored)
 # ==============================================================
 def fast_inject_weight(job_id, tag_id, weight):
     tag_id, weight = str(tag_id).strip(), str(weight).strip()
-    print(f"🚀 Fast Dropdown Inject: Tag: {tag_id} | Wt: {weight}g | Job: {job_id}")
+    logger.info(f"Fast Dropdown Inject: Tag: {tag_id} | Wt: {weight}g | Job: {job_id}")
     try:
         with sync_playwright() as p:
-            try: browser = p.chromium.connect_over_cdp(CDP_URL)
-            except: return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
+            try: 
+                browser = p.chromium.connect_over_cdp(CDP_URL, timeout=10000)
+            except: 
+                return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
             
             target_frame = None
             for page in browser.contexts[0].pages:
@@ -127,17 +158,10 @@ def fast_inject_weight(job_id, tag_id, weight):
             if row.count() > 0:
                 weight_input = row.first.locator("input.weightCls, input.scan-input, input[name='articlWeight'], input:not([type='hidden']):not([type='checkbox'])").first
                 if weight_input.count() > 0:
-                    # NORMAL SPEED (Humanized) - Aapka Code
-                    js_enable = """node => {
-                        node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
-                    }"""
-                    weight_input.evaluate(js_enable)
-                    weight_input.focus()
-                    weight_input.fill("")
-                    time.sleep(random.uniform(0.1, 0.2)) 
-                    weight_input.type(weight, delay=random.randint(30, 80)) 
-                    
-                    weight_input.evaluate("node => { node.dispatchEvent(new Event('input', { bubbles: true })); node.dispatchEvent(new Event('change', { bubbles: true })); }")
+                    # 🚀 APPLYING THE RULE BREAKER
+                    js_payload = get_force_inject_js(weight)
+                    weight_input.evaluate(js_payload)
+                    time.sleep(random.uniform(0.3, 0.6))
                     
                     save_btn = row.first.locator("text='Save'").first
                     if save_btn.is_visible():
@@ -149,31 +173,38 @@ def fast_inject_weight(job_id, tag_id, weight):
                         
                     try: browser.disconnect()
                     except: pass
+                    logger.info(f"Success: Tag '{tag_id}' Saved Fast Dropdown")
                     return {"status": "success", "msg": f"✅ Tag '{tag_id}' Saved ({weight}g)"}
-                else: return {"status": "error", "msg": "⚠️ Input box nahi mila!"}
-            else: return {"status": "error", "msg": f"⚠️ Tag '{tag_id}' list me nahi mila."}
-    except Exception as e: return {"status": "error", "msg": f"⚠️ Error: {str(e)}"}
-
+                else: 
+                    return {"status": "error", "msg": "⚠️ Input box nahi mila!"}
+            else: 
+                return {"status": "error", "msg": f"⚠️ Tag '{tag_id}' list me nahi mila."}
+    except Exception as e: 
+        logger.error(f"Fast Inject Error: {str(e)}")
+        return {"status": "error", "msg": f"⚠️ Error: {str(e)}"}
 
 # ==============================================================
 # 3. FULL AUTO INJECTION (Poori list ek sath)
 # ==============================================================
 def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
     if not job_data: return "⚠️ डेटाबेस खाली है।"
-    print(f"👻 Auto Injection Started (Humanized Speed)... Job: {job_id}")
+    logger.info(f"Auto Injection Started... Job: {job_id}")
+    
     try:
         with sync_playwright() as p:
-            try: browser = p.chromium.connect_over_cdp(CDP_URL)
-            except: return "⚠️ ब्राउज़र ओपन नहीं hai!"
+            try: 
+                browser = p.chromium.connect_over_cdp(CDP_URL, timeout=10000)
+            except Exception as e: 
+                return "⚠️ ब्राउज़र ओपन नहीं hai!"
 
             job_matched = False
             for page in browser.contexts[0].pages:
                 try:
-                    if job_id in page.locator("body").inner_text(): job_matched = True; break
+                    if job_id in page.locator("body").inner_text(timeout=2000): job_matched = True; break
                 except: pass
                 for frame in page.frames:
                     try:
-                        if job_id in frame.locator("body").inner_text(): job_matched = True; break
+                        if job_id in frame.locator("body").inner_text(timeout=2000): job_matched = True; break
                     except: pass
                 if job_matched: break
                 
@@ -186,6 +217,7 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
             for item in job_data:
                 tag_id, weight = str(item[0]).strip(), str(item[1]).strip()
                 target_frame = None
+                
                 for page in browser.contexts[0].pages:
                     try:
                         if page.locator("tr").filter(has=page.locator("td").get_by_text(tag_id, exact=True)).count() > 0:
@@ -205,41 +237,37 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
                     if row.count() > 0:
                         target_row = row.first
                         weight_input = target_row.locator("input.weightCls, input.scan-input, input[name='articlWeight'], input:not([type='hidden']):not([type='checkbox'])").first
+                        
                         if weight_input.count() > 0:
                             current_val = str(weight_input.evaluate("node => node.value")).strip()
                             if current_val != weight:
-                                # NORMAL SPEED (Humanized) - Aapka Code
-                                js_enable = """node => {
-                                    node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
-                                }"""
-                                weight_input.evaluate(js_enable)
-                                
-                                weight_input.focus()
-                                weight_input.fill("")
-                                time.sleep(random.uniform(0.1, 0.25)) 
-                                
-                                weight_input.type(weight, delay=random.randint(30, 70))
-                                
-                                weight_input.evaluate("node => { node.dispatchEvent(new Event('input', { bubbles: true })); node.dispatchEvent(new Event('change', { bubbles: true })); }")
+                                # 🚀 APPLYING THE RULE BREAKER
+                                js_payload = get_force_inject_js(weight)
+                                weight_input.evaluate(js_payload)
+                                time.sleep(random.uniform(0.3, 0.6))
                                 
                                 save_btn = target_row.locator("text='Save'").first
                                 if save_btn.is_visible():
                                     main_page = target_frame if hasattr(target_frame, 'once') else target_frame.page
                                     main_page.once("dialog", lambda dialog: dialog.accept())
-                                    
                                     time.sleep(random.uniform(0.2, 0.5)) 
                                     save_btn.click(force=True)
                                     
                                     base_delay = delay_ms / 1000.0
                                     time.sleep(base_delay + random.uniform(0.1, 0.6))
                                 filled_count += 1
-                except Exception as e: print(f"⚠️ Error: {e}")
+                except Exception as e: 
+                    logger.error(f"Error with tag {tag_id}: {e}")
 
             try: browser.disconnect() 
             except: pass
+            
+            logger.info(f"Success! {filled_count} Tags Save kar diye gaye.")
             return f"✅ Success! {filled_count} Tags Save kar diye gaye."
-    except Exception as e: return f"⚠️ Error: {e}"
-
+            
+    except Exception as e: 
+        logger.error(f"Ghost Inject Error: {e}")
+        return f"⚠️ Error: {e}"
 
 # ==============================================================
 # 4. DATA SCRAPING HELPERS
@@ -264,19 +292,19 @@ def extract_id_from_page(browser):
                 except: pass
     return {"type": "Manual Scrape", "id": "Scraped_Job"}
 
-
 # ==============================================================
-# 5. MASTER SCRAPING ENGINE (MACHINE SPEED + MULTI-PAGE FIX)
+# 5. MASTER SCRAPING ENGINE (THREAD-SAFE & CRASH-PROOF)
 # ==============================================================
 def _smart_scrape_logic():
     try:
-        from playwright.sync_api import sync_playwright
-        import time
-        import eel
-        
         with sync_playwright() as p:
-            try: browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
-            except: return {"status": "error", "msg": "⚠️ Secure BIS Browser connect nahi ho paya!"}
+            try: 
+                browser = p.chromium.connect_over_cdp(CDP_URL, timeout=10000)
+            except Exception as e: 
+                return {"status": "error", "msg": "⚠️ Secure BIS Browser connect nahi ho paya!"}
+            
+            if len(browser.contexts) > 0:
+                browser.contexts[0].set_default_timeout(15000)
             
             master_info = None
             list_page = None
@@ -306,7 +334,6 @@ def _smart_scrape_logic():
             }
             """
             
-            print("🎯 Scanning all hidden frames for Master Table...")
             for context in browser.contexts:
                 for page in context.pages:
                     for frame in [page] + page.frames:
@@ -350,53 +377,64 @@ def _smart_scrape_logic():
                 
             all_jobs_data = []
 
-            # ⚡ MACHINE SPEED FETCH LOOP WITH NEXT BUTTON LOGIC
             for job_info in job_cards_to_process:
                 jc_no = job_info["job_card"]
                 req_no = job_info["req_no"]
+                new_page = None 
                 
-                print(f"⚡ MACHINE SPEED Fetching: {jc_no} (Req: {req_no})...")
                 try:
                     row_locator = list_page.locator(f"tr:has-text('{jc_no}')").first
                     action_link = row_locator.locator("a", has_text="QM Job Card View").first
-                    
                     browser_context = list_page.context if hasattr(list_page, 'context') else list_page.page.context
                     
                     with browser_context.expect_page(timeout=15000) as new_page_info:
-                        action_link.evaluate("node => node.click()")
+                        action_link.evaluate("node => { node.setAttribute('target', '_blank'); node.click(); }")
                     
                     new_page = new_page_info.value
-                    new_page.wait_for_load_state("domcontentloaded")
+                    
+                    try:
+                        new_page.wait_for_load_state("domcontentloaded", timeout=15000)
+                        new_page.wait_for_timeout(2000)
+                    except PlaywrightTimeoutError:
+                        logger.warning(f"{jc_no}: Page load timeout, attempting scrape anyway")
                     
                     js_scrape_inner = """
                     () => {
                         let results = [];
-                        let tables = document.querySelectorAll('table');
-                        for (let t of tables) {
-                            let text = t.innerText.toUpperCase();
-                            if (text.includes('TAG ID') || text.includes('AHC TAG')) {
-                                let rows = t.querySelectorAll('tbody tr, tr');
-                                let headers = Array.from(t.querySelectorAll('th, td')).map(cell => cell.innerText.trim().toUpperCase());
-                                let tagIdx = headers.findIndex(h => h.includes('TAG ID') || h.includes('AHC TAG'));
-                                let catIdx = headers.findIndex(h => h.includes('CATEGORY'));
-                                let huidIdx = headers.findIndex(h => h.includes('HUID'));
-                                let purIdx = headers.findIndex(h => h.includes('PURITY'));
-                                
-                                if(tagIdx === -1) continue;
-                                
-                                for (let r of rows) {
-                                    let cells = r.querySelectorAll('td');
-                                    if (cells.length > tagIdx) {
-                                        let tag = cells[tagIdx].innerText.trim();
-                                        if (!tag || tag.toUpperCase().includes('TAG')) continue;
-                                        let cat = (catIdx !== -1 && cells.length > catIdx && cells[catIdx]) ? cells[catIdx].innerText.trim() : "-";
-                                        let huid = (huidIdx !== -1 && cells.length > huidIdx && cells[huidIdx]) ? cells[huidIdx].innerText.trim() : "";
-                                        let pur = (purIdx !== -1 && cells.length > purIdx && cells[purIdx]) ? cells[purIdx].innerText.trim() : "-";
-                                        if (huid !== "") { cat = cat + " (HUID: " + huid + ")"; }
-                                        results.push([tag, cat, pur]);
+                        let docs = [document];
+                        let iframes = document.querySelectorAll('iframe');
+                        iframes.forEach(f => {
+                            try { if (f.contentDocument) docs.push(f.contentDocument); } catch(e){}
+                        });
+
+                        for (let d of docs) {
+                            let tables = d.querySelectorAll('table');
+                            for (let t of tables) {
+                                let text = t.innerText.toUpperCase();
+                                if (text.includes('TAG ID') || text.includes('AHC TAG')) {
+                                    let rows = t.querySelectorAll('tbody tr, tr');
+                                    let headers = Array.from(t.querySelectorAll('th, td')).map(cell => cell.innerText.trim().toUpperCase());
+                                    let tagIdx = headers.findIndex(h => h.includes('TAG ID') || h.includes('AHC TAG'));
+                                    let catIdx = headers.findIndex(h => h.includes('CATEGORY'));
+                                    let huidIdx = headers.findIndex(h => h.includes('HUID'));
+                                    let purIdx = headers.findIndex(h => h.includes('PURITY'));
+                                    
+                                    if(tagIdx === -1) continue;
+                                    
+                                    for (let r of rows) {
+                                        let cells = r.querySelectorAll('td');
+                                        if (cells.length > tagIdx) {
+                                            let tag = cells[tagIdx].innerText.trim();
+                                            if (!tag || tag.toUpperCase().includes('TAG')) continue;
+                                            let cat = (catIdx !== -1 && cells.length > catIdx && cells[catIdx]) ? cells[catIdx].innerText.trim() : "-";
+                                            let huid = (huidIdx !== -1 && cells.length > huidIdx && cells[huidIdx]) ? cells[huidIdx].innerText.trim() : "";
+                                            let pur = (purIdx !== -1 && cells.length > purIdx && cells[purIdx]) ? cells[purIdx].innerText.trim() : "-";
+                                            if (huid !== "") { cat = cat + " (HUID: " + huid + ")"; }
+                                            results.push([tag, cat, pur]);
+                                        }
                                     }
+                                    if (results.length > 0) return results;
                                 }
-                                if (results.length > 0) return results;
                             }
                         }
                         return null;
@@ -416,26 +454,32 @@ def _smart_scrape_logic():
                             previous_data = items
                             
                         next_btn = new_page.locator("a#tab_logic_next, a.paginate_button.next").first
+                        if next_btn.count() == 0:
+                            for frame in new_page.frames:
+                                frame_btn = frame.locator("a#tab_logic_next, a.paginate_button.next").first
+                                if frame_btn.count() > 0:
+                                    next_btn = frame_btn
+                                    break
+
                         if next_btn.count() > 0 and next_btn.is_visible():
                             btn_class = next_btn.get_attribute("class") or ""
-                            if "disabled" in btn_class:
-                                break 
+                            if "disabled" in btn_class: break 
                             
                             next_btn.evaluate("node => node.click()")
-                            time.sleep(0.5) 
+                            new_page.wait_for_timeout(2000) 
                         else:
                             break 
                     
                     if len(all_scraped_items) > 0: 
                         all_jobs_data.append({"job_card": jc_no, "req_no": req_no, "items": all_scraped_items})
-                        print(f"✅ Fast Grab: {len(all_scraped_items)} total items from {jc_no}")
-                    else:
-                        print(f"⚠️ Data not found in {jc_no} tab")
                         
-                    new_page.close()
-                    
                 except Exception as e:
-                    print(f"⚠️ Error processing {jc_no}: {e}")
+                    logger.error(f"Skipped {jc_no} due to Error: {e}")
+                finally:
+                    try:
+                        if new_page and not new_page.is_closed():
+                            new_page.close()
+                    except: pass
 
             if len(all_jobs_data) > 0:
                 try:
@@ -446,7 +490,7 @@ def _smart_scrape_logic():
                             info = {"type": "Job Card", "id": j_data["job_card"], "req_no": j_data["req_no"]}
                             save_func(j_data["items"], info)
                 except Exception as e:
-                    print("Silent DB Save Error:", e)
+                    logger.error(f"Silent DB Save Error: {e}")
 
                 first_job = all_jobs_data[0]
                 try: browser.disconnect()
@@ -460,35 +504,36 @@ def _smart_scrape_logic():
             else:
                 return {"status": "error", "msg": "⚠️ Selected Requests ke tabs se koi data nahi mila!"}
             
-    except Exception as e: return {"status": "error", "msg": f"Script Error: {str(e)}"}
+    except Exception as e: 
+        logger.error(f"Scraper Logic Error: {str(e)}")
+        return {"status": "error", "msg": f"Script Error: {str(e)}"}
 
 # ==============================================================
-# 🚀 NAYA: GUARANTEED EVENT LOOP FIX (THREAD-SAFE WRAPPER)
+# 6. THREAD-SAFE WRAPPER FOR EEL
 # ==============================================================
 def smart_scrape_with_huid():
-    print("🚀 THREAD-SAFE TURBO SCRAPER CALLED!")
+    logger.info("THREAD-SAFE TURBO SCRAPER CALLED")
     try:
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             future = executor.submit(_smart_scrape_logic)
             return future.result()
     except Exception as e:
+        logger.error(f"Thread Error: {str(e)}")
         return {"status": "error", "msg": f"Thread Error: {str(e)}"}
 
-
 # ==============================================================
-# 6. WAIT FOR JOB CARD NO
+# 7. WAIT FOR JOB CARD NO
 # ==============================================================
 def wait_for_job_card_no():
-    print("👻 Waiting for Job Card Generation...")
     try:
         with sync_playwright() as p:
-            browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
+            browser = p.chromium.connect_over_cdp(CDP_URL, timeout=10000)
             job_card_no = None
-            for _ in range(45): 
+            for _ in range(30): 
                 for page in browser.contexts[0].pages:
                     for frame in [page] + page.frames:
                         try:
-                            text = frame.locator("body").inner_text()
+                            text = frame.locator("body").inner_text(timeout=1000)
                             if "Job Card Created" in text:
                                 match = re.search(r"Job Card Created\s*[:\-]?\s*(\d{8,})", text, re.IGNORECASE)
                                 if match: job_card_no = match.group(1); break
@@ -503,20 +548,21 @@ def wait_for_job_card_no():
     except Exception as e: return {"status": "error", "msg": str(e)}
 
 # ==============================================================
-# 7. AUTO GENERATE REQUEST & JOB CARDS (Master Automation)
+# 8. AUTO GENERATE REQUEST & JOB CARDS (Master Automation)
 # ==============================================================
 def auto_generate_request_and_jobs(jeweller_code, state, items_list):
-    print("🚀 Master Automation Started: Request -> Job Cards")
+    logger.info("Master Automation Started: Request -> Job Cards")
     try:
         with sync_playwright() as p:
             try: 
-                browser = p.chromium.connect_over_cdp(CDP_URL)
+                browser = p.chromium.connect_over_cdp(CDP_URL, timeout=15000)
                 page = browser.contexts[0].pages[0] 
+                page.set_default_timeout(15000)
             except: 
                 return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
 
             page.locator("text=Create Hallmarking Request").first.click()
-            page.locator("text=PROCESSING").wait_for(state="hidden")
+            page.locator("text=PROCESSING").wait_for(state="hidden", timeout=15000)
 
             page.locator("span:has-text('Select State')").first.click()
             page.locator("input[role='textbox']").fill(state)
@@ -535,22 +581,22 @@ def auto_generate_request_and_jobs(jeweller_code, state, items_list):
                 page.locator("input[placeholder='Enter quantity']").fill(str(item['quantity']))
                 page.locator("input[placeholder='Enter weight']").fill(str(item['weight']))
                 page.locator("button:has-text('Save')").first.click()
-                page.locator("text=PROCESSING").wait_for(state="hidden")
+                page.locator("text=PROCESSING").wait_for(state="hidden", timeout=15000)
 
             page.locator("button:has-text('Submit to AHC')").first.click()
-            page.locator("text=PROCESSING").wait_for(state="hidden")
+            page.locator("text=PROCESSING").wait_for(state="hidden", timeout=15000)
 
             req_text = page.locator("h4:has-text('Request Number is :')").inner_text()
             request_number = req_text.split(":")[-1].strip()
 
             page.locator("text=Home Page").first.click()
-            page.locator("text=PROCESSING").wait_for(state="hidden")
+            page.locator("text=PROCESSING").wait_for(state="hidden", timeout=15000)
             page.locator("div:has-text('New request')").nth(1).click()
-            page.locator("text=PROCESSING").wait_for(state="hidden")
+            page.locator("text=PROCESSING").wait_for(state="hidden", timeout=15000)
 
             row = page.locator(f"tr:has-text('{request_number}')")
             row.locator("a[title='Action']").first.click()
-            page.locator("text=PROCESSING").wait_for(state="hidden")
+            page.locator("text=PROCESSING").wait_for(state="hidden", timeout=15000)
 
             page.locator("input[type='radio'][value='Yes']").first.check()
             rows = page.locator("table tbody tr").all()
@@ -566,7 +612,7 @@ def auto_generate_request_and_jobs(jeweller_code, state, items_list):
             page.locator("input[placeholder='Enter AHC Receiving remarks']").fill("ok")
             page.once("dialog", lambda dialog: dialog.accept()) 
             page.locator("button:has-text('Submit')").first.click()
-            page.locator("text=PROCESSING").wait_for(state="hidden")
+            page.locator("text=PROCESSING").wait_for(state="hidden", timeout=15000)
 
             job_card_text = page.locator("h4:has-text('Job Card Created')").inner_text()
             job_cards = [x.strip() for x in job_card_text.split("Created")[-1].split(",") if x.strip()]
@@ -580,10 +626,11 @@ def auto_generate_request_and_jobs(jeweller_code, state, items_list):
                 "job_cards": job_cards
             }
     except Exception as e: 
+        logger.error(f"Auto Gen Error: {str(e)}")
         return {"status": "error", "msg": f"⚠️ Error: {str(e)}"}
 
 # ==============================================================
-# 🌟 NAYA FEATURE: RECEPTION WEB POPUP BRIDGE
+# 9. UI BRIDGE FOR MODAL POPUPS
 # ==============================================================
 @eel.expose
 def submit_reception_selection(selected):
@@ -593,4 +640,4 @@ def submit_reception_selection(selected):
 @eel.expose
 def cancel_reception_selection():
     global ui_queue
-    ui_queue.put([]) # Empty list ka matlab cancel
+    ui_queue.put([])
