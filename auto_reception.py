@@ -2,54 +2,73 @@ from playwright.sync_api import sync_playwright
 import time
 import re
 
-# Playwright ke liye local browser ka URL
+# Playwright connect over port URL
 CDP_URL = "http://localhost:9222"
 
 # ==============================================================
 # 1. SINGLE RECEPTION INJECTION (Manual Table Button Se)
 # ==============================================================
 def inject_single_reception_tag(job_id, tag_id, weight):
-    tag_id, weight = str(tag_id).strip(), str(weight).strip()
+    tag_id = str(tag_id).strip()
+    weight = str(weight).strip()
     print(f"👻 Live Injecting Tag: {tag_id} | Weight: {weight}g | Job: {job_id}")
     
     try:
         with sync_playwright() as p:
-            try: browser = p.chromium.connect_over_cdp(CDP_URL)
-            except: return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
+            try:
+                browser = p.chromium.connect_over_cdp(CDP_URL)
+            except:
+                return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
             
             job_matched = False
             for page in browser.contexts[0].pages:
                 try:
                     text = page.locator("body").inner_text()
-                    if job_id in text: job_matched = True; break
-                except: pass
+                    if job_id in text:
+                        job_matched = True
+                        break
+                except:
+                    pass
                 for frame in page.frames:
                     try:
-                        if job_id in frame.locator("body").inner_text(): job_matched = True; break
-                    except: pass
-                if job_matched: break
+                        if job_id in frame.locator("body").inner_text():
+                            job_matched = True
+                            break
+                    except:
+                        pass
+                if job_matched:
+                    break
                 
             if not job_matched:
-                try: browser.disconnect()
-                except: pass
+                try:
+                    browser.disconnect()
+                except:
+                    pass
                 return {"status": "error", "msg": f"❌ Wrong Page! Site par ID '{job_id}' open nahi hai."}
 
             target_frame = None
             for page in browser.contexts[0].pages:
                 try:
                     if page.locator("tr").filter(has=page.locator("td").get_by_text(tag_id, exact=True)).count() > 0:
-                        target_frame = page; break
-                except: pass
+                        target_frame = page
+                        break
+                except:
+                    pass
                 for frame in page.frames:
                     try:
                         if frame.locator("tr").filter(has=frame.locator("td").get_by_text(tag_id, exact=True)).count() > 0:
-                            target_frame = frame; break
-                    except: pass
-                if target_frame: break
+                            target_frame = frame
+                            break
+                    except:
+                        pass
+                if target_frame:
+                    break
 
             if not target_frame:
-                try: browser.disconnect()
-                except: pass
+                try:
+                    browser.disconnect()
+                except:
+                    pass
                 return {"status": "error", "msg": f"⚠️ Tag '{tag_id}' nahi mila."}
 
             row = target_frame.locator("tr").filter(has=target_frame.locator("td").get_by_text(tag_id, exact=True))
@@ -60,9 +79,12 @@ def inject_single_reception_tag(job_id, tag_id, weight):
                 
                 if weight_input.count() > 0:
                     js_inject = f"""node => {{
-                        node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
-                        node.removeAttribute('onpaste'); node.removeAttribute('oncopy'); 
-                        node.removeAttribute('oncut'); node.removeAttribute('oncontextmenu'); 
+                        node.removeAttribute('disabled'); 
+                        node.removeAttribute('readonly'); 
+                        node.removeAttribute('onpaste'); 
+                        node.removeAttribute('oncopy'); 
+                        node.removeAttribute('oncut'); 
+                        node.removeAttribute('oncontextmenu'); 
                         node.value = '{weight}'; 
                         node.dispatchEvent(new Event('input', {{ bubbles: true }})); 
                         node.dispatchEvent(new Event('change', {{ bubbles: true }})); 
@@ -77,42 +99,57 @@ def inject_single_reception_tag(job_id, tag_id, weight):
                         save_btn.click(force=True)
                         time.sleep(1)
                         
-                    try: browser.disconnect()
-                    except: pass
+                    try:
+                        browser.disconnect()
+                    except:
+                        pass
                     return {"status": "success", "msg": f"✅ Tag '{tag_id}' Saved ({weight}g)"}
-                else: return {"status": "error", "msg": "⚠️ Input box nahi mila!"}
-            else: return {"status": "error", "msg": f"⚠️ Tag '{tag_id}' Editable list me nahi mila."}
-    except Exception as e: return {"status": "error", "msg": f"⚠️ Error: {str(e)}"}
+                else:
+                    return {"status": "error", "msg": "⚠️ Input box nahi mila!"}
+            else:
+                return {"status": "error", "msg": f"⚠️ Tag '{tag_id}' Editable list me nahi mila."}
+    except Exception as e:
+        return {"status": "error", "msg": f"⚠️ Error: {str(e)}"}
 
 
 # ==============================================================
 # 2. FAST DROPDOWN INJECTION 
 # ==============================================================
 def fast_inject_weight(job_id, tag_id, weight):
-    tag_id, weight = str(tag_id).strip(), str(weight).strip()
+    tag_id = str(tag_id).strip()
+    weight = str(weight).strip()
     print(f"🚀 Fast Dropdown Inject: Tag: {tag_id} | Wt: {weight}g | Job: {job_id}")
     
     try:
         with sync_playwright() as p:
-            try: browser = p.chromium.connect_over_cdp(CDP_URL)
-            except: return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
+            try:
+                browser = p.chromium.connect_over_cdp(CDP_URL)
+            except:
+                return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
             
             target_frame = None
             for page in browser.contexts[0].pages:
                 try:
                     if page.locator("tr").filter(has=page.locator("td").get_by_text(tag_id, exact=True)).count() > 0:
-                        target_frame = page; break
-                except: pass
+                        target_frame = page
+                        break
+                except:
+                    pass
                 for frame in page.frames:
                     try:
                         if frame.locator("tr").filter(has=frame.locator("td").get_by_text(tag_id, exact=True)).count() > 0:
-                            target_frame = frame; break
-                    except: pass
-                if target_frame: break
+                            target_frame = frame
+                            break
+                    except:
+                        pass
+                if target_frame:
+                    break
 
             if not target_frame:
-                try: browser.disconnect()
-                except: pass
+                try:
+                    browser.disconnect()
+                except:
+                    pass
                 return {"status": "error", "msg": f"⚠️ Tag '{tag_id}' list me nahi mila."}
 
             row = target_frame.locator("tr").filter(has=target_frame.locator("td").get_by_text(tag_id, exact=True))
@@ -121,9 +158,12 @@ def fast_inject_weight(job_id, tag_id, weight):
                 weight_input = row.first.locator("input.weightCls, input.scan-input, input[name='articlWeight'], input:not([type='hidden']):not([type='checkbox'])").first
                 if weight_input.count() > 0:
                     js_inject = f"""node => {{
-                        node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
-                        node.removeAttribute('onpaste'); node.removeAttribute('oncopy'); 
-                        node.removeAttribute('oncut'); node.removeAttribute('oncontextmenu'); 
+                        node.removeAttribute('disabled'); 
+                        node.removeAttribute('readonly'); 
+                        node.removeAttribute('onpaste'); 
+                        node.removeAttribute('oncopy'); 
+                        node.removeAttribute('oncut'); 
+                        node.removeAttribute('oncontextmenu'); 
                         node.value = '{weight}'; 
                         node.dispatchEvent(new Event('input', {{ bubbles: true }})); 
                         node.dispatchEvent(new Event('change', {{ bubbles: true }})); 
@@ -138,60 +178,84 @@ def fast_inject_weight(job_id, tag_id, weight):
                         save_btn.click(force=True)
                         time.sleep(1)
                         
-                    try: browser.disconnect()
-                    except: pass
+                    try:
+                        browser.disconnect()
+                    except:
+                        pass
                     return {"status": "success", "msg": f"✅ Tag '{tag_id}' Saved ({weight}g)"}
-                else: return {"status": "error", "msg": "⚠️ Input box nahi mila!"}
-            else: return {"status": "error", "msg": f"⚠️ Tag '{tag_id}' list me nahi mila."}
-    except Exception as e: return {"status": "error", "msg": f"⚠️ Error: {str(e)}"}
+                else:
+                    return {"status": "error", "msg": "⚠️ Input box nahi mila!"}
+            else:
+                return {"status": "error", "msg": f"⚠️ Tag '{tag_id}' list me nahi mila."}
+    except Exception as e:
+        return {"status": "error", "msg": f"⚠️ Error: {str(e)}"}
 
 
 # ==============================================================
 # 3. FULL AUTO INJECTION (Poori list ek sath)
 # ==============================================================
 def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
-    if not job_data: return "⚠️ डेटाबेस खाली है।"
+    if not job_data:
+        return "⚠️ डेटाबेस खाली है।"
     print(f"👻 Auto Injection Started (Speed: {delay_ms}ms)... Job: {job_id}")
 
     try:
         with sync_playwright() as p:
-            try: browser = p.chromium.connect_over_cdp(CDP_URL)
-            except: return "⚠️ ब्राउज़र ओपन नहीं है!"
+            try:
+                browser = p.chromium.connect_over_cdp(CDP_URL)
+            except:
+                return "⚠️ ब्राउज़र ओपन नहीं है!"
 
             job_matched = False
             for page in browser.contexts[0].pages:
                 try:
-                    if job_id in page.locator("body").inner_text(): job_matched = True; break
-                except: pass
+                    if job_id in page.locator("body").inner_text():
+                        job_matched = True
+                        break
+                except:
+                    pass
                 for frame in page.frames:
                     try:
-                        if job_id in frame.locator("body").inner_text(): job_matched = True; break
-                    except: pass
-                if job_matched: break
+                        if job_id in frame.locator("body").inner_text():
+                            job_matched = True
+                            break
+                    except:
+                        pass
+                if job_matched:
+                    break
                 
             if not job_matched:
-                try: browser.disconnect()
-                except: pass
+                try:
+                    browser.disconnect()
+                except:
+                    pass
                 return f"❌ Wrong Page! Site par ID '{job_id}' open nahi hai."
 
             filled_count = 0
             for item in job_data:
-                tag_id, weight = str(item[0]).strip(), str(item[1]).strip()
+                tag_id = str(item[0]).strip()
+                weight = str(item[1]).strip()
                 
                 target_frame = None
                 for page in browser.contexts[0].pages:
                     try:
                         if page.locator("tr").filter(has=page.locator("td").get_by_text(tag_id, exact=True)).count() > 0:
-                            target_frame = page; break
-                    except: pass
+                            target_frame = page
+                            break
+                    except:
+                        pass
                     for frame in page.frames:
                         try:
                             if frame.locator("tr").filter(has=frame.locator("td").get_by_text(tag_id, exact=True)).count() > 0:
-                                target_frame = frame; break
-                        except: pass
-                    if target_frame: break
+                                target_frame = frame
+                                break
+                        except:
+                            pass
+                    if target_frame:
+                        break
 
-                if not target_frame: continue
+                if not target_frame:
+                    continue
 
                 try:
                     row = target_frame.locator("tr").filter(has=target_frame.locator("td").get_by_text(tag_id, exact=True))
@@ -204,9 +268,12 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
                             current_val = str(weight_input.evaluate("node => node.value")).strip()
                             if current_val != weight:
                                 js_inject = f"""node => {{
-                                    node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
-                                    node.removeAttribute('onpaste'); node.removeAttribute('oncopy'); 
-                                    node.removeAttribute('oncut'); node.removeAttribute('oncontextmenu'); 
+                                    node.removeAttribute('disabled'); 
+                                    node.removeAttribute('readonly'); 
+                                    node.removeAttribute('onpaste'); 
+                                    node.removeAttribute('oncopy'); 
+                                    node.removeAttribute('oncut'); 
+                                    node.removeAttribute('oncontextmenu'); 
                                     node.value = '{weight}'; 
                                     node.dispatchEvent(new Event('input', {{ bubbles: true }})); 
                                     node.dispatchEvent(new Event('change', {{ bubbles: true }})); 
@@ -221,16 +288,20 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
                                     time.sleep(delay_ms / 1000.0)
                                 
                                 filled_count += 1
-                except Exception as e: print(f"⚠️ Error: {e}")
+                except Exception as e:
+                    print(f"⚠️ Error: {e}")
 
-            try: browser.disconnect() 
-            except: pass
+            try:
+                browser.disconnect() 
+            except:
+                pass
             return f"✅ Success! {filled_count} Tags Save kar diye gaye."
-    except Exception as e: return f"⚠️ Error: {e}"
+    except Exception as e:
+        return f"⚠️ Error: {e}"
 
 
 # ==============================================================
-# 4. DATA SCRAPING & 5. WAIT FOR JOB CARD
+# 4. SINGLE MANUAL SCRAPING WORKFLOWS
 # ==============================================================
 def extract_id_from_page(browser):
     js_code = """
@@ -247,16 +318,20 @@ def extract_id_from_page(browser):
         for frame in [page] + page.frames:
             try:
                 res = frame.evaluate(js_code)
-                if res: return res
-            except: pass
+                if res:
+                    return res
+            except:
+                pass
     return None
 
 def smart_scrape_with_huid():
     print("👻 Scraping Table from BIS...")
     try:
         with sync_playwright() as p:
-            try: browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
-            except: return {"status": "error", "msg": "⚠️ Secure BIS Browser connect nahi ho paya!"}
+            try:
+                browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
+            except:
+                return {"status": "error", "msg": "⚠️ Secure BIS Browser connect nahi ho paya!"}
             
             extracted_info = extract_id_from_page(browser)
             js_code = """
@@ -307,8 +382,10 @@ def smart_scrape_with_huid():
                         if res and len(res) > 0: 
                             target_frame = frame
                             break
-                    except Exception: pass
-                if target_frame: break
+                    except Exception:
+                        pass
+                if target_frame:
+                    break
 
             if target_frame:
                 previous_data = [] 
@@ -331,11 +408,15 @@ def smart_scrape_with_huid():
                         break 
             
             scraped_items = all_scraped_items 
-            try: browser.disconnect()
-            except: pass
-            if not scraped_items: return {"status": "error", "msg": "⚠️ Data nahi mila!"}
+            try:
+                browser.disconnect()
+            except:
+                pass
+            if not scraped_items:
+                return {"status": "error", "msg": "⚠️ Data nahi mila! "}
             return {"status": "success", "items": scraped_items, "extracted_info": extracted_info}
-    except Exception as e: return {"status": "error", "msg": str(e)}
+    except Exception as e:
+        return {"status": "error", "msg": str(e)}
 
 def wait_for_job_card_no():
     print("👻 Waiting for Job Card Generation...")
@@ -350,16 +431,26 @@ def wait_for_job_card_no():
                             text = frame.locator("body").inner_text()
                             if "Job Card Created" in text:
                                 match = re.search(r"Job Card Created\s*[:\-]?\s*(\d{8,})", text, re.IGNORECASE)
-                                if match: job_card_no = match.group(1); break
-                        except: pass
-                    if job_card_no: break
-                if job_card_no: break
+                                if match:
+                                    job_card_no = match.group(1)
+                                    break
+                        except:
+                            pass
+                    if job_card_no:
+                        break
+                if job_card_no:
+                    break
                 time.sleep(1)
-            try: browser.disconnect()
-            except: pass
-            if not job_card_no: return {"status": "error", "msg": "⚠️ Time out!"}
+            try:
+                browser.disconnect()
+            except:
+                pass
+            if not job_card_no:
+                return {"status": "error", "msg": "⚠️ Time out!"}
             return {"status": "success", "job_card": job_card_no}
-    except Exception as e: return {"status": "error", "msg": str(e)}
+    except Exception as e:
+        return {"status": "error", "msg": str(e)}
+
 
 # ==============================================================
 # 🌟 NAYA FEATURE: 100% LIVE WEB SCRAPING & TAB MANAGEMENT
@@ -369,8 +460,10 @@ def scrape_all_requests_from_main():
     print("🌐 Website ke Main Dashboard se data fetch kar rahe hain...")
     try:
         with sync_playwright() as p:
-            try: browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
-            except: return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
+            try:
+                browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
+            except:
+                return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
 
             target_page = browser.contexts[0].pages[0] 
 
@@ -404,9 +497,11 @@ def scrape_all_requests_from_main():
                 res = target_page.evaluate(js_code)
                 if res:
                     for req, jobs in res.items():
-                        if req not in all_data: all_data[req] = []
+                        if req not in all_data:
+                            all_data[req] = []
                         for j in jobs:
-                            if j not in all_data[req]: all_data[req].append(j)
+                            if j not in all_data[req]:
+                                all_data[req].append(j)
 
                 next_btn = target_page.locator("a.paginate_button.next, button.next, a:has-text('Next')").last
                 if next_btn.count() > 0 and "disabled" not in (next_btn.get_attribute("class") or ""):
@@ -416,18 +511,21 @@ def scrape_all_requests_from_main():
                 else:
                     break 
 
-            try: browser.disconnect()
-            except: pass
+            try:
+                browser.disconnect()
+            except:
+                pass
 
             if not all_data:
                 return {"status": "error", "msg": "⚠️ Website par koi Request/Job Data nahi mila!"}
 
             return {"status": "success", "data": all_data}
-    except Exception as e: return {"status": "error", "msg": str(e)}
+    except Exception as e:
+        return {"status": "error", "msg": str(e)}
 
 
 def process_selected_requests(selected_reqs, master_info):
-    """Website par QM View kholna, Tag/Purity nikalna, aur tab band karna (With Autonomous Pagination)"""
+    """Website par QM View kholna, Tag/Purity nikalna, aur tab band karna (With Autonomous Next-Page Scanning)"""
     print(f"🌐 Website par selected requests ki scraping shuru: {selected_reqs}")
     from modules import database as db
     
@@ -444,37 +542,38 @@ def process_selected_requests(selected_reqs, master_info):
                 for job in jobs:
                     print(f"🔍 Website par Job dhundh rahe hain: {job}")
 
-                    # 🛡️ PROBLEM 1 SOLVED: Search box clear karke global pagination scan loop chalana
+                    # 🛡️ SEARCH RESET TRAP: Clear input to perform dynamic next-page loop scanner
                     search_box = main_page.locator("input[type='search']").first
                     if search_box.count() > 0:
                         search_box.fill("")
                         time.sleep(0.5)
 
-                    # Har baar scan karne se pehle hamesha Page 1 par reset karein
+                    # Hamesha loop chalane se pehle Page 1 par reset karein
                     try:
                         main_page.evaluate('() => { let f = document.querySelector(".paginate_button.first, a:has-text(\\"First\\")"); if(f) f.click(); }')
                         time.sleep(1.0)
-                    except: pass
+                    except:
+                        pass
 
                     row = None
-                    # Autonomous loop jab tak target page par job na mil jaye (e.g. Page 4)
+                    # Dynamic browser execution loop until target job row is hit (e.g. Page 4)
                     while True:
                         row_match = main_page.locator("tr", has_text=job).first
                         if row_match.count() > 0 and row_match.is_visible():
                             row = row_match
                             break
                         
-                        # Agar is panne par nahi mila, toh next panna click karein
+                        # Next button control mechanism
                         next_btn = main_page.locator("a.paginate_button.next, button.next, a:has-text('Next')").last
                         if next_btn.count() > 0 and "disabled" not in (next_btn.get_attribute("class") or ""):
                             print(f"➡️ Job {job} is page par nahi mila, clicking Next Dashboard Page...")
                             next_btn.click()
                             time.sleep(1.5)
                         else:
-                            break  # Saare panne scan ho gaye aur nahi mila
+                            break 
 
                     if not row:
-                        print(f"⚠️ Website par pure navigation ke baad bhi Job {job} nahi mila.")
+                        print(f"⚠️ pure dashboard par navigation ke baad bhi Job {job} nahi mila.")
                         continue
 
                     view_btn = row.locator("a").last 
@@ -541,8 +640,10 @@ def process_selected_requests(selected_reqs, master_info):
 
                     print(f"✅ Website se {len(all_scraped_items)} tags fetch kiye.")
 
-                    try: new_page.close()
-                    except: pass
+                    try:
+                        new_page.close()
+                    except:
+                        pass
 
                     if all_scraped_items:
                         db.save_scraped_job_card(job, all_scraped_items, request_no=req)
@@ -550,8 +651,11 @@ def process_selected_requests(selected_reqs, master_info):
 
                     main_page.bring_to_front()
 
-            try: browser.disconnect()
-            except: pass
+            try:
+                browser.disconnect()
+            except:
+                pass
             return {"status": "success", "msg": f"✅ Website se Data Fetch ho gaya! {total_jobs_saved} Jobs Database mein save ho gaye."}
             
-    except Exception as e: return {"status": "error", "msg": str(e)}
+    except Exception as e:
+        return {"status": "error", "msg": str(e)}
