@@ -251,129 +251,9 @@ def extract_id_from_page(browser):
             except: pass
     return None
 
-def smart_scrape_with_huid():
-    print("👻 Scraping Table from BIS...")
-    try:
-        with sync_playwright() as p:
-            try: browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
-            except: return {"status": "error", "msg": "⚠️ Secure BIS Browser connect nahi ho paya!"}
-            
-            extracted_info = extract_id_from_page(browser)
-            js_code = """
-            () => {
-                let results = [];
-                let tables = document.querySelectorAll('table');
-                for (let t of tables) {
-                    let text = t.innerText.toUpperCase();
-                    if (text.includes('TAG ID') || text.includes('AHC TAG')) {
-                        let rows = t.querySelectorAll('tr');
-                        let tagIdx = -1, catIdx = -1, huidIdx = -1, purIdx = -1;
-                        for(let r of rows) {
-                            let headers = Array.from(r.querySelectorAll('th, td')).map(cell => cell.innerText.trim().toUpperCase());
-                            tagIdx = headers.findIndex(h => h.includes('TAG ID') || h.includes('AHC TAG'));
-                            if(tagIdx !== -1) {
-                                catIdx = headers.findIndex(h => h.includes('CATEGORY'));
-                                huidIdx = headers.findIndex(h => h.includes('HUID'));
-                                purIdx = headers.findIndex(h => h.includes('PURITY'));
-                                break;
-                            }
-                        }
-                        if(tagIdx === -1) continue;
-                        for (let r of rows) {
-                            let cells = r.querySelectorAll('td');
-                            if (cells.length > tagIdx) {
-                                let tag = cells[tagIdx].innerText.trim();
-                                if (!tag || tag.toUpperCase().includes('TAG')) continue;
-                                let cat = (catIdx !== -1 && cells.length > catIdx && cells[catIdx]) ? cells[catIdx].innerText.trim() : "-";
-                                let huid = (huidIdx !== -1 && cells.length > huidIdx && cells[huidIdx]) ? cells[huidIdx].innerText.trim() : "";
-                                let pur = (purIdx !== -1 && cells.length > purIdx && cells[purIdx]) ? cells[purIdx].innerText.trim() : "-";
-                                if (huid !== "") { cat = cat + " (HUID: " + huid + ")"; }
-                                results.push([tag, cat, pur]);
-                            }
-                        }
-                        if (results.length > 0) return results;
-                    }
-                }
-                return null;
-            }
-            """
-            all_scraped_items = []
-            target_frame = None
-            
-            for page in browser.contexts[0].pages:
-                for frame in [page] + page.frames:
-                    try:
-                        res = frame.evaluate(js_code)
-                        if res and len(res) > 0: 
-                            target_frame = frame
-                            break
-                    except Exception: pass
-                if target_frame: break
-
-            if target_frame:
-                previous_data = None 
-                while True:
-                    res = target_frame.evaluate(js_code)
-                    
-                    if res == previous_data:
-                        break 
-                        
-                    if res and len(res) > 0:
-                        for item in res:
-                            if item not in all_scraped_items:
-                                all_scraped_items.append(item)
-                    
-                    previous_data = res
-                    
-                    next_btn = target_frame.locator("a#tab_logic_next, a.paginate_button.next, li.next a, a:has-text('Next'), a:has-text('›'), a[title*='Next']").last
-                    
-                    if next_btn.count() > 0:
-                        btn_class = next_btn.get_attribute("class") or ""
-                        is_disabled = "disabled" in btn_class or next_btn.get_attribute("aria-disabled") == "true" or next_btn.get_attribute("disabled") is not None
-                        
-                        if not is_disabled:
-                            print(f"➡️ Page Load ho raha hai... (Abhi tak {len(all_scraped_items)} items mile)")
-                            next_btn.click(force=True)
-                            time.sleep(1.5) 
-                        else:
-                            break 
-                    else:
-                        break
-            
-            scraped_items = all_scraped_items 
-            try: browser.disconnect()
-            except: pass
-            if not scraped_items: return {"status": "error", "msg": "⚠️ Data nahi mila!"}
-            return {"status": "success", "items": scraped_items, "extracted_info": extracted_info}
-    except Exception as e: return {"status": "error", "msg": str(e)}
-
-def wait_for_job_card_no():
-    print("👻 Waiting for Job Card Generation...")
-    try:
-        with sync_playwright() as p:
-            browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
-            job_card_no = None
-            for _ in range(45): 
-                for page in browser.contexts[0].pages:
-                    for frame in [page] + page.frames:
-                        try:
-                            text = frame.locator("body").inner_text()
-                            if "Job Card Created" in text:
-                                match = re.search(r"Job Card Created\s*[:\-]?\s*(\d{8,})", text, re.IGNORECASE)
-                                if match: job_card_no = match.group(1); break
-                        except: pass
-                    if job_card_no: break
-                if job_card_no: break
-                time.sleep(1)
-            try: browser.disconnect()
-            except: pass
-            if not job_card_no: return {"status": "error", "msg": "⚠️ Time out!"}
-            return {"status": "success", "job_card": job_card_no}
-    except Exception as e: return {"status": "error", "msg": str(e)}
-
 
 # ==============================================================
-# 🌟 NAYA FEATURE: 100% LIVE WEB SCRAPING & TAB MANAGEMENT
+# 🌟 100% LIVE WEB SCRAPING WITH DYNAMIC WAIT (3-MIN TIMEOUT)
 # ==============================================================
 def scrape_all_requests_from_main():
     """Main page par sabhi pages ko (Next click karke) padhna aur Request/Job list banana"""
@@ -411,25 +291,33 @@ def scrape_all_requests_from_main():
                 return hasData ? results : null;
             }
             """
-
-            time.sleep(2.0) 
             
             target_frame = None
+            max_wait = 180 # 3 minute (180 seconds) ka maximum intezaar
+            start_time = time.time()
             
-            for page in browser.contexts[0].pages:
-                for frame in [page] + page.frames:
-                    try:
-                        res = frame.evaluate(js_code)
-                        if res: 
-                            target_frame = frame
-                            break
-                    except: pass
-                if target_frame: break
+            print("⏳ Dashboard table load hone ka wait kar rahe hain (Max 3 minutes)...")
+            
+            # 🕵️‍♂️ DYNAMIC WAIT LOOP FOR MAIN FRAME
+            while time.time() - start_time < max_wait:
+                for page in browser.contexts[0].pages:
+                    for frame in [page] + page.frames:
+                        try:
+                            res = frame.evaluate(js_code)
+                            if res: 
+                                target_frame = frame
+                                break
+                        except: pass
+                    if target_frame: break
+                
+                if target_frame:
+                    break # Frame mil gaya, intezaar khatam
+                time.sleep(1) # Nahi mila toh 1 second ruko aur dobara check karo
 
             if not target_frame:
                 try: browser.disconnect()
                 except: pass
-                return {"status": "error", "msg": "⚠️ Website par koi Request/Job Data nahi mila! (Table not found)"}
+                return {"status": "error", "msg": "⚠️ Timeout Error: 3 minute me Website par koi Request/Job Data load nahi hua!"}
 
             all_data = {}
             previous_data_state = None 
@@ -458,7 +346,15 @@ def scrape_all_requests_from_main():
                     if not is_disabled:
                         print("➡️ Website ke agle panne (Next Page) par jaa rahe hain...")
                         next_btn.click(force=True)
-                        time.sleep(2.0) 
+                        
+                        # Page change hone ka chota sa wait
+                        wait_start = time.time()
+                        while time.time() - wait_start < 10:
+                            try:
+                                if target_frame.evaluate(js_code) != previous_data_state:
+                                    break
+                            except: pass
+                            time.sleep(0.5)
                     else:
                         break 
                 else:
@@ -481,64 +377,67 @@ def process_selected_requests(selected_reqs, master_info):
         with sync_playwright() as p:
             browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
             context = browser.contexts[0]
-            main_page = context.pages[0]
 
             total_jobs_saved = 0
+            max_wait_time = 180 # 3 minutes timeout
 
             for req in selected_reqs:
                 jobs = master_info.get(req, [])
                 for job in jobs:
-                    print(f"🔍 Website par Job dhundh rahe hain: {job}")
+                    print(f"\n🔍 Website par Job dhundh rahe hain: {job}")
 
-                    time.sleep(1.0) # 🛑 FIX: Thoda delay taaki naya tab close hone ke baad DOM stable ho jaye
-
-                    # 🕵️‍♂️ SMART FRAME FINDER (Ab hum Playwright ki jagah JavaScript se dhundhenge)
+                    # 🕵️‍♂️ ULTRA-SMART FRAME DETECTOR (WITH DYNAMIC WAIT)
                     target_frame = None
-                    for frame in [main_page] + main_page.frames:
-                        try:
-                            # Hum wahi robust 8-digit match logic lagayenge yahan bhi
-                            has_data = frame.evaluate('''() => {
-                                let rows = document.querySelectorAll('table tbody tr');
-                                for(let r of rows) {
-                                    if ((r.innerText || "").match(/\\b\\d{8,}\\b/)) return true;
-                                }
-                                return false;
-                            }''')
-                            if has_data:
-                                target_frame = frame
-                                break
-                        except: pass
-                        
-                    # Backup plan: Agar 8-digit nahi mile (jaise khali table), toh koi bhi existing table le lo
-                    if not target_frame:
-                        for frame in [main_page] + main_page.frames:
-                            try:
-                                if frame.evaluate("() => document.querySelectorAll('table tbody tr').length") > 0:
-                                    target_frame = frame
-                                    break
-                            except: pass
+                    wait_start_time = time.time()
+                    
+                    print("⏳ Page frame load hone ka wait kar rahe hain...")
+                    
+                    while time.time() - wait_start_time < max_wait_time:
+                        for page in context.pages:
+                            for frame in [page] + page.frames:
+                                try:
+                                    is_target = frame.evaluate("""() => {
+                                        let text = document.body.innerText.toUpperCase();
+                                        let hasTable = document.querySelectorAll('table tbody tr').length > 0;
+                                        return hasTable && (text.includes('JOB CARD') || text.includes('QM JOB') || text.includes('ACTION'));
+                                    }""")
+                                    if is_target:
+                                        target_frame = frame
+                                        break
+                                except: pass
+                            if target_frame: break
+                            
+                        if target_frame: 
+                            break # Mil gaya, bahar aao
+                        time.sleep(1) # 1 sec ruko
 
                     if not target_frame:
-                        print(f"⚠️ Error: Table frame nahi mila.")
+                        print(f"⚠️ Timeout: 3 min wait kiya par Table frame nahi mila.")
                         continue 
 
-                    # 🔄 Reset to 'First' page before searching
+                    # 🔄 Reset to 'First' page
                     try:
-                        first_btn = target_frame.locator("a.paginate_button.first, li.first a, a:has-text('First'), a:has-text('«'), a[title*='First']").last
+                        first_btn = target_frame.locator("a.paginate_button.first, li.first a, a:has-text('First'), a:has-text('«'), a.paginate_button:has-text('1')").first
                         if first_btn.count() > 0:
                             f_class = first_btn.get_attribute("class") or ""
-                            if "disabled" not in f_class:
+                            if "disabled" not in f_class and "current" not in f_class:
                                 first_btn.click(force=True)
-                                time.sleep(2.0) # Page 1 reload hone ka pakka wait
+                                time.sleep(1.0) 
                     except: pass
 
-                    # 🔍 OPTIONAL: Agar search box hai toh use karo, warna directly list scan karega
+                    # 🔍 Search Box (agar ho)
                     search_box = target_frame.locator("input[type='search'], input.form-control.input-sm").first
                     if search_box.count() > 0:
                         try:
                             search_box.fill(job)
-                            search_box.press("Enter") # Search ke baad enter button zaroori hai
-                            time.sleep(1.5) 
+                            search_box.press("Enter")
+                            
+                            # Dynamic wait search results ke liye
+                            s_wait = time.time()
+                            while time.time() - s_wait < 10:
+                                if target_frame.locator("tr", has_text=job).count() > 0:
+                                    break
+                                time.sleep(0.5)
                         except: pass
 
                     job_found = False
@@ -556,10 +455,18 @@ def process_selected_requests(selected_reqs, master_info):
                         
                         if next_btn.count() > 0:
                             btn_class = next_btn.get_attribute("class") or ""
-                            if "disabled" not in btn_class:
+                            if "disabled" not in btn_class and next_btn.get_attribute("aria-disabled") != "true":
                                 print(f"➡️ Page par nahi mila, agla page scan kar rahe hain...")
                                 next_btn.click(force=True)
-                                time.sleep(1.5)
+                                
+                                # Dynamic wait for next page
+                                p_wait = time.time()
+                                while time.time() - p_wait < 10:
+                                    try:
+                                        if target_frame.locator("tr", has_text=job).count() > 0 or target_frame.evaluate("""() => document.readyState === 'complete'"""):
+                                            break
+                                    except: pass
+                                    time.sleep(0.5)
                             else:
                                 break
                         else:
@@ -572,30 +479,38 @@ def process_selected_requests(selected_reqs, master_info):
                             except: pass
                         continue 
 
-                    # 👁️ View Button click karo
+                    # 👁️ Click View Button
                     view_btn = row.locator("a").last 
 
                     try:
                         with context.expect_page(timeout=10000) as new_page_info:
                             view_btn.click(force=True)
                         new_page = new_page_info.value
-                        new_page.wait_for_load_state("networkidle")
-                        time.sleep(2.0) # Naya tab load hone do
                     except Exception as e:
                         print(f"⚠️ Naya tab kholne me dikkat: {e}")
                         continue
 
-                    # 🕵️‍♂️ NAYE TAB MEIN IFRAME CHECK
+                    # 🕵️‍♂️ NAYE TAB MEIN FRAME CHECK (WITH DYNAMIC WAIT)
                     target_new_frame = None
-                    for frame in [new_page] + new_page.frames:
-                        try:
-                            if "TAG ID" in frame.locator("body").inner_text().upper():
-                                target_new_frame = frame
-                                break
-                        except: pass
+                    tab_wait_start = time.time()
+                    
+                    print("⏳ Naye tab me Tags load hone ka wait kar rahe hain...")
+                    
+                    while time.time() - tab_wait_start < max_wait_time:
+                        for page_tab in context.pages:
+                            for frame in [page_tab] + page_tab.frames:
+                                try:
+                                    if "TAG ID" in frame.locator("body").inner_text().upper():
+                                        target_new_frame = frame
+                                        break
+                                except: pass
+                            if target_new_frame: break
+                        if target_new_frame: 
+                            break # Mil gaya, intezaar khatam
+                        time.sleep(1) # 1 sec ruko
                         
                     if not target_new_frame: 
-                        target_new_frame = new_page
+                        target_new_frame = new_page # Agar kuch na mile toh fallback
 
                     js_code_tags = """
                     () => {
@@ -654,7 +569,15 @@ def process_selected_requests(selected_reqs, master_info):
                             btn_class = next_btn.get_attribute("class") or ""
                             if "disabled" not in btn_class and next_btn.get_attribute("aria-disabled") != "true":
                                 next_btn.click(force=True)
-                                time.sleep(1.5)
+                                
+                                # Dynamic wait for next page in Tags list
+                                t_wait = time.time()
+                                while time.time() - t_wait < 10:
+                                    try:
+                                        if target_new_frame.evaluate(js_code_tags) != previous_page_data:
+                                            break
+                                    except: pass
+                                    time.sleep(0.5)
                             else:
                                 break
                         else:
@@ -669,12 +592,15 @@ def process_selected_requests(selected_reqs, master_info):
                         db.save_scraped_job_card(job, all_scraped_items, request_no=req)
                         total_jobs_saved += 1
 
-                    main_page.bring_to_front()
-
-                    if search_box.count() > 0:
+                    # Reset search box for next loop
+                    if target_frame and search_box.count() > 0:
                         try: search_box.fill("")
                         except: pass
                         time.sleep(0.5)
+                        
+                    # 🔄 Naya job dhundhne se pehle wapas main page ko aage lao (focus set karo)
+                    try: context.pages[0].bring_to_front()
+                    except: pass
 
             try: browser.disconnect()
             except: pass
