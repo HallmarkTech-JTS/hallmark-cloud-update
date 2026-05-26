@@ -233,7 +233,7 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
 
 
 # ==============================================================
-# 4. DATA SCRAPING & 5. WAIT FOR JOB CARD
+# 4. DATA SCRAPING & WAIT FOR JOB CARD
 # ==============================================================
 def extract_id_from_page(browser):
     js_code = """
@@ -314,27 +314,35 @@ def smart_scrape_with_huid():
                 if target_frame: break
 
             if target_frame:
-                previous_data = [] 
+                previous_data = None 
                 while True:
                     res = target_frame.evaluate(js_code)
-                    if res and len(res) > 0 and res != previous_data:
+                    
+                    if res == previous_data:
+                        break # Prevent infinite loop
+                        
+                    if res and len(res) > 0:
                         for item in res:
                             if item not in all_scraped_items:
                                 all_scraped_items.append(item)
-                        previous_data = res
                     
-                    next_btn = target_frame.locator("a#tab_logic_next")
+                    previous_data = res
                     
-                    # Button ki class check kar rahe hain
-                    btn_class = next_btn.get_attribute("class") if next_btn.count() > 0 else ""
+                    # Safe selector check
+                    next_btn = target_frame.locator("a#tab_logic_next, a.paginate_button.next, li.next a, a:has-text('Next'), a:has-text('›'), a[title*='Next']").last
                     
-                    # Agar button hai aur 'disabled' nahi hai, tabhi click karega
-                    if next_btn.count() > 0 and "disabled" not in btn_class:
-                        print(f"➡️ Page Load ho raha hai... (Abhi tak {len(all_scraped_items)} items mile)")
-                        next_btn.click()
-                        time.sleep(1.5) 
+                    if next_btn.count() > 0:
+                        btn_class = next_btn.get_attribute("class") or ""
+                        is_disabled = "disabled" in btn_class or next_btn.get_attribute("aria-disabled") == "true" or next_btn.get_attribute("disabled") is not None
+                        
+                        if not is_disabled:
+                            print(f"➡️ Page Load ho raha hai... (Abhi tak {len(all_scraped_items)} items mile)")
+                            next_btn.click(force=True)
+                            time.sleep(1.5) 
+                        else:
+                            break 
                     else:
-                        break 
+                        break
             
             scraped_items = all_scraped_items 
             try: browser.disconnect()
@@ -423,19 +431,22 @@ def scrape_all_requests_from_main():
                             if j not in all_data[req]: all_data[req].append(j)
 
                 previous_data_state = res # Current data ko save kar lo agli checking ke liye
-
-                next_btn = target_page.locator("a.paginate_button.next, button.next, a:has-text('Next')").last
                 
-                # Naya check: aria-disabled bhi check karega
-                btn_class = next_btn.get_attribute("class") or ""
-                is_disabled = "disabled" in btn_class or next_btn.get_attribute("aria-disabled") == "true" or next_btn.get_attribute("disabled") is not None
-
-                if next_btn.count() > 0 and not is_disabled:
-                    print("➡️ Website ke agle panne (Next Page) par jaa rahe hain...")
-                    next_btn.click(force=True)
-                    time.sleep(2.0) # Thoda extra time do page load hone ke liye
+                # Naya Check: '›' icon aur title attributes ke sath
+                next_btn = target_page.locator("a.paginate_button.next, li.next a, a:has-text('Next'), a:has-text('›'), a[title*='Next']").last
+                
+                if next_btn.count() > 0:
+                    btn_class = next_btn.get_attribute("class") or ""
+                    is_disabled = "disabled" in btn_class or next_btn.get_attribute("aria-disabled") == "true" or next_btn.get_attribute("disabled") is not None
+                    
+                    if not is_disabled:
+                        print("➡️ Website ke agle panne (Next Page) par jaa rahe hain...")
+                        next_btn.click(force=True)
+                        time.sleep(2.0) # Thoda extra time do page load hone ke liye
+                    else:
+                        break 
                 else:
-                    break 
+                    break
 
             try: browser.disconnect()
             except: pass
@@ -529,17 +540,33 @@ def process_selected_requests(selected_reqs, master_info):
                     """
 
                     all_scraped_items = []
+                    previous_page_data = None
+                    
                     while True:
                         res = new_page.evaluate(js_code_tags)
+                        
+                        if res == previous_page_data:
+                            break
+                            
                         if res and len(res) > 0:
                             for item in res:
                                 if item not in all_scraped_items:
                                     all_scraped_items.append(item)
+                                    
+                        previous_page_data = res
 
-                        next_btn = new_page.locator("a#tab_logic_next, a.paginate_button.next").last
-                        if next_btn.count() > 0 and "disabled" not in (next_btn.get_attribute("class") or ""):
-                            next_btn.click()
-                            time.sleep(1.5)
+                        # Naya Check yahan bhi lagaya gaya hai
+                        next_btn = new_page.locator("a#tab_logic_next, a.paginate_button.next, li.next a, a:has-text('Next'), a:has-text('›'), a[title*='Next']").last
+                        
+                        if next_btn.count() > 0:
+                            btn_class = next_btn.get_attribute("class") or ""
+                            is_disabled = "disabled" in btn_class or next_btn.get_attribute("aria-disabled") == "true" or next_btn.get_attribute("disabled") is not None
+                            
+                            if not is_disabled:
+                                next_btn.click(force=True)
+                                time.sleep(1.5)
+                            else:
+                                break
                         else:
                             break 
 
