@@ -386,7 +386,6 @@ def process_selected_requests(selected_reqs, master_info):
                 for job in jobs:
                     print(f"\n🔍 Website par Job dhundh rahe hain: {job}")
 
-                    # 🕵️‍♂️ ULTRA-SMART FRAME DETECTOR (WITH DYNAMIC WAIT)
                     target_frame = None
                     wait_start_time = time.time()
                     
@@ -408,14 +407,13 @@ def process_selected_requests(selected_reqs, master_info):
                             if target_frame: break
                             
                         if target_frame: 
-                            break # Mil gaya, bahar aao
-                        time.sleep(1) # 1 sec ruko
+                            break 
+                        time.sleep(1) 
 
                     if not target_frame:
                         print(f"⚠️ Timeout: 3 min wait kiya par Table frame nahi mila.")
                         continue 
 
-                    # 🔄 Reset to 'First' page
                     try:
                         first_btn = target_frame.locator("a.paginate_button.first, li.first a, a:has-text('First'), a:has-text('«'), a.paginate_button:has-text('1')").first
                         if first_btn.count() > 0:
@@ -425,14 +423,12 @@ def process_selected_requests(selected_reqs, master_info):
                                 time.sleep(1.0) 
                     except: pass
 
-                    # 🔍 Search Box (agar ho)
                     search_box = target_frame.locator("input[type='search'], input.form-control.input-sm").first
                     if search_box.count() > 0:
                         try:
                             search_box.fill(job)
                             search_box.press("Enter")
                             
-                            # Dynamic wait search results ke liye
                             s_wait = time.time()
                             while time.time() - s_wait < 10:
                                 if target_frame.locator("tr", has_text=job).count() > 0:
@@ -443,7 +439,6 @@ def process_selected_requests(selected_reqs, master_info):
                     job_found = False
                     row = None
                     
-                    # 🚀 SMART PAGE SCANNER
                     while True:
                         row = target_frame.locator("tr", has_text=job).first
                         
@@ -459,7 +454,6 @@ def process_selected_requests(selected_reqs, master_info):
                                 print(f"➡️ Page par nahi mila, agla page scan kar rahe hain...")
                                 next_btn.click(force=True)
                                 
-                                # Dynamic wait for next page
                                 p_wait = time.time()
                                 while time.time() - p_wait < 10:
                                     try:
@@ -479,12 +473,13 @@ def process_selected_requests(selected_reqs, master_info):
                             except: pass
                         continue 
 
-                    # 👁️ Click View Button
+                    # 👁️ Click View Button (🚨 YAHAN JAVASCRIPT BYPASS LAGAYA GAYA HAI)
                     view_btn = row.locator("a").last 
 
                     try:
                         with context.expect_page(timeout=10000) as new_page_info:
-                            view_btn.click(force=True)
+                            # 🚀 `.click(force=True)` ki jagah `.evaluate()` use kiya hai taaki visibility check bypass ho jaye
+                            view_btn.evaluate("node => node.click()")
                         new_page = new_page_info.value
                     except Exception as e:
                         print(f"⚠️ Naya tab kholne me dikkat: {e}")
@@ -506,11 +501,11 @@ def process_selected_requests(selected_reqs, master_info):
                                 except: pass
                             if target_new_frame: break
                         if target_new_frame: 
-                            break # Mil gaya, intezaar khatam
-                        time.sleep(1) # 1 sec ruko
+                            break 
+                        time.sleep(1) 
                         
                     if not target_new_frame: 
-                        target_new_frame = new_page # Agar kuch na mile toh fallback
+                        target_new_frame = new_page 
 
                     js_code_tags = """
                     () => {
@@ -568,9 +563,8 @@ def process_selected_requests(selected_reqs, master_info):
                         if next_btn.count() > 0:
                             btn_class = next_btn.get_attribute("class") or ""
                             if "disabled" not in btn_class and next_btn.get_attribute("aria-disabled") != "true":
-                                next_btn.click(force=True)
+                                next_btn.evaluate("node => node.click()") # Yahan bhi JS click lagaya hai safey ke liye
                                 
-                                # Dynamic wait for next page in Tags list
                                 t_wait = time.time()
                                 while time.time() - t_wait < 10:
                                     try:
@@ -592,13 +586,11 @@ def process_selected_requests(selected_reqs, master_info):
                         db.save_scraped_job_card(job, all_scraped_items, request_no=req)
                         total_jobs_saved += 1
 
-                    # Reset search box for next loop
                     if target_frame and search_box.count() > 0:
                         try: search_box.fill("")
                         except: pass
                         time.sleep(0.5)
                         
-                    # 🔄 Naya job dhundhne se pehle wapas main page ko aage lao (focus set karo)
                     try: context.pages[0].bring_to_front()
                     except: pass
 
