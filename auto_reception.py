@@ -59,7 +59,6 @@ def inject_single_reception_tag(job_id, tag_id, weight):
                 weight_input = target_row.locator("input.weightCls, input.scan-input, input[name='articlWeight'], input:not([type='hidden']):not([type='checkbox'])").first
                 
                 if weight_input.count() > 0:
-                    # 🚨 NEW BYPASS: No Click, No Keyboard. Direct Backend Injection!
                     js_inject = f"""node => {{
                         node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
                         node.removeAttribute('onpaste'); node.removeAttribute('oncopy'); 
@@ -121,7 +120,6 @@ def fast_inject_weight(job_id, tag_id, weight):
             if row.count() > 0:
                 weight_input = row.first.locator("input.weightCls, input.scan-input, input[name='articlWeight'], input:not([type='hidden']):not([type='checkbox'])").first
                 if weight_input.count() > 0:
-                    # 🚨 NEW BYPASS
                     js_inject = f"""node => {{
                         node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
                         node.removeAttribute('onpaste'); node.removeAttribute('oncopy'); 
@@ -205,7 +203,6 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
                         if weight_input.count() > 0:
                             current_val = str(weight_input.evaluate("node => node.value")).strip()
                             if current_val != weight:
-                                # 🚨 NEW BYPASS: Backend Data Injection Only
                                 js_inject = f"""node => {{
                                     node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
                                     node.removeAttribute('onpaste'); node.removeAttribute('oncopy'); 
@@ -319,7 +316,7 @@ def smart_scrape_with_huid():
                     res = target_frame.evaluate(js_code)
                     
                     if res == previous_data:
-                        break # Prevent infinite loop
+                        break 
                         
                     if res and len(res) > 0:
                         for item in res:
@@ -328,7 +325,6 @@ def smart_scrape_with_huid():
                     
                     previous_data = res
                     
-                    # Safe selector check
                     next_btn = target_frame.locator("a#tab_logic_next, a.paginate_button.next, li.next a, a:has-text('Next'), a:has-text('›'), a[title*='Next']").last
                     
                     if next_btn.count() > 0:
@@ -387,12 +383,11 @@ def scrape_all_requests_from_main():
             try: browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
             except: return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
 
-            # 🧠 Smart JavaScript: Jo kisi bhi table se 8+ digit ke number nikal lega
             js_code = """
             () => {
                 let results = {};
                 let rows = document.querySelectorAll('table tbody tr');
-                if(rows.length === 0) return null; // Agar frame me table nahi hai toh aage badho
+                if(rows.length === 0) return null; 
                 
                 let hasData = false;
                 for(let r of rows) {
@@ -417,11 +412,10 @@ def scrape_all_requests_from_main():
             }
             """
 
-            time.sleep(2.0) # Page render hone ke liye zaroori wait
+            time.sleep(2.0) 
             
             target_frame = None
             
-            # 🕵️‍♂️ IFRAME SCANNER: Website ke har page aur har frame me table dhundho
             for page in browser.contexts[0].pages:
                 for frame in [page] + page.frames:
                     try:
@@ -441,7 +435,6 @@ def scrape_all_requests_from_main():
             previous_data_state = None 
 
             while True:
-                # Ab hum exactly usi frame se data nikalenge jisme table mili thi
                 res = target_frame.evaluate(js_code)
                 
                 if res == previous_data_state:
@@ -456,7 +449,6 @@ def scrape_all_requests_from_main():
 
                 previous_data_state = res 
                 
-                # Next button bhi usi frame me dhundhenge
                 next_btn = target_frame.locator("a.paginate_button.next, li.next a, a:has-text('Next'), a:has-text('›'), a[title*='Next']").last
                 
                 if next_btn.count() > 0:
@@ -498,20 +490,21 @@ def process_selected_requests(selected_reqs, master_info):
                 for job in jobs:
                     print(f"🔍 Website par Job dhundh rahe hain: {job}")
 
-                    # 🕵️‍♂️ SMART FRAME FINDER: Search box kis iframe me hai, wo dhundho
+                    # 🛑 FIX: Search box zaroori nahi hai! Sirf table wala frame dhundho.
                     target_frame = None
                     for frame in [main_page] + main_page.frames:
                         try:
-                            if frame.locator("input[type='search']").count() > 0:
+                            # Agar frame mein table hai, toh yahi humara target hai
+                            if frame.locator("table tbody tr").count() > 0:
                                 target_frame = frame
                                 break
                         except: pass
                         
                     if not target_frame:
-                        print(f"⚠️ Error: Website par Search Box nahi mila! (Iframe error)")
-                        continue # Agle job par jao
+                        print(f"⚠️ Error: Table frame nahi mila.")
+                        continue 
 
-                    # 🔄 QA FIX: Naya job dhundhne se pehle wapas 'First' page par aao
+                    # 🔄 Reset to 'First' page before searching
                     try:
                         first_btn = target_frame.locator("a.paginate_button.first, li.first a, a:has-text('First'), a:has-text('«'), a[title*='First']").last
                         if first_btn.count() > 0:
@@ -521,15 +514,18 @@ def process_selected_requests(selected_reqs, master_info):
                                 time.sleep(1.0)
                     except: pass
 
-                    search_box = target_frame.locator("input[type='search']").first
-                    search_box.fill(job)
-                    search_box.press("Enter") # Enter press karna zaroori hai
-                    time.sleep(1.5) 
+                    # 🔍 OPTIONAL: Agar search box hai toh use karo, warna koi baat nahi
+                    search_box = target_frame.locator("input[type='search'], input.form-control.input-sm").first
+                    if search_box.count() > 0:
+                        try:
+                            search_box.fill(job)
+                            time.sleep(1.0) 
+                        except: pass
 
                     job_found = False
                     row = None
                     
-                    # 🚀 SMART PAGE SCANNER (Iframe ke andar Next page scan karega)
+                    # 🚀 SMART PAGE SCANNER (Bina Search box ke bhi kaam karega)
                     while True:
                         row = target_frame.locator("tr", has_text=job).first
                         
@@ -552,10 +548,12 @@ def process_selected_requests(selected_reqs, master_info):
                             
                     if not job_found:
                         print(f"⚠️ Alert: Poori website scan ki, par Job {job} nahi mila.")
-                        search_box.fill("")
-                        time.sleep(0.5)
+                        if search_box.count() > 0:
+                            try: search_box.fill("")
+                            except: pass
                         continue 
 
+                    # 👁️ View Button par click karna
                     view_btn = row.locator("a").last 
 
                     try:
@@ -568,18 +566,17 @@ def process_selected_requests(selected_reqs, master_info):
                         print(f"⚠️ Naya tab kholne me dikkat: {e}")
                         continue
 
-                    # 🕵️‍♂️ NAYE TAB MEIN BHI IFRAME CHECK (Agar tag list iframe me ho)
+                    # 🕵️‍♂️ NAYE TAB MEIN IFRAME CHECK
                     target_new_frame = None
                     for frame in [new_page] + new_page.frames:
                         try:
-                            # Check karte hain ki kya is frame me 'TAG ID' likha hai
                             if "TAG ID" in frame.locator("body").inner_text().upper():
                                 target_new_frame = frame
                                 break
                         except: pass
                         
                     if not target_new_frame: 
-                        target_new_frame = new_page # Fallback
+                        target_new_frame = new_page
 
                     js_code_tags = """
                     () => {
@@ -656,7 +653,8 @@ def process_selected_requests(selected_reqs, master_info):
                     main_page.bring_to_front()
 
                     if search_box.count() > 0:
-                        search_box.fill("")
+                        try: search_box.fill("")
+                        except: pass
                         time.sleep(0.5)
 
             try: browser.disconnect()
