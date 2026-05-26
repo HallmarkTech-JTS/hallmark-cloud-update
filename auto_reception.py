@@ -358,7 +358,7 @@ def _smart_scrape_logic():
             ui_queue = queue.Queue() 
             
             try:
-                eel.open_reception_selector_modal(unique_reqs, master_info)()
+                eel.open_reception_selector_modal(unique_reqs, master_info)
             except Exception as e:
                 return {"status": "error", "msg": f"UI Bridge Error: {e}"}
             
