@@ -82,7 +82,7 @@ def inject_single_reception_tag(job_id, tag_id, weight):
                     if save_btn.is_visible():
                         main_page = target_frame if hasattr(target_frame, 'once') else target_frame.page
                         main_page.once("dialog", lambda dialog: dialog.accept())
-                        save_btn.click(force=True)
+                        save_btn.evaluate("node => node.click()") # JS Click lagaya
                         time.sleep(1)
                         
                     try: browser.disconnect()
@@ -145,7 +145,7 @@ def fast_inject_weight(job_id, tag_id, weight):
                     if save_btn.is_visible():
                         main_page = target_frame if hasattr(target_frame, 'once') else target_frame.page
                         main_page.once("dialog", lambda dialog: dialog.accept())
-                        save_btn.click(force=True)
+                        save_btn.evaluate("node => node.click()") # JS Click lagaya
                         time.sleep(1)
                         
                     try: browser.disconnect()
@@ -154,7 +154,7 @@ def fast_inject_weight(job_id, tag_id, weight):
                 else: return {"status": "error", "msg": "⚠️ Input box nahi mila!"}
             else: return {"status": "error", "msg": f"⚠️ Tag '{tag_id}' list me nahi mila."}
     except Exception as e:
-        logging.error(f"Fast Inject Error: {e}")
+        logging.error(f"Fast Inject Error: {e}", exc_info=True)
         return {"status": "error", "msg": f"⚠️ Error: {str(e)}"}
 
 
@@ -237,7 +237,7 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
                                 if save_btn.is_visible():
                                     main_page = target_frame if hasattr(target_frame, 'once') else target_frame.page
                                     main_page.once("dialog", lambda dialog: dialog.accept())
-                                    save_btn.click(force=True)
+                                    save_btn.evaluate("node => node.click()") # JS Click lagaya
                                     time.sleep(delay_ms / 1000.0)
                                 
                                 filled_count += 1
@@ -250,7 +250,7 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
                 return f"🛑 STOPPED! {filled_count} Tags Save hone ke baad process rok di gayi."
             return f"✅ Success! {filled_count} Tags Save kar diye gaye."
     except Exception as e:
-        logging.error(f"Auto Inject Error: {e}")
+        logging.error(f"Auto Inject Error: {e}", exc_info=True)
         return f"⚠️ Error: {e}"
 
 
@@ -384,7 +384,8 @@ def scrape_all_requests_from_main():
                     
                     if not is_disabled:
                         print("➡️ Website ke agle panne (Next Page) par jaa rahe hain...")
-                        next_btn.click(force=True)
+                        # 🚀 ERROR FIX: JS Force Click Lagaya
+                        next_btn.evaluate("node => node.click()") 
                         
                         wait_start = time.time()
                         while time.time() - wait_start < 10:
@@ -471,7 +472,8 @@ def process_selected_requests(selected_reqs, master_info):
                         if first_btn.count() > 0:
                             f_class = first_btn.get_attribute("class") or ""
                             if "disabled" not in f_class and "current" not in f_class:
-                                first_btn.click(force=True)
+                                # 🚀 ERROR FIX: JS Force Click Lagaya
+                                first_btn.evaluate("node => node.click()") 
                                 time.sleep(1.0) 
                     except: pass
 
@@ -506,7 +508,8 @@ def process_selected_requests(selected_reqs, master_info):
                             btn_class = next_btn.get_attribute("class") or ""
                             if "disabled" not in btn_class and next_btn.get_attribute("aria-disabled") != "true":
                                 print(f"➡️ Page par nahi mila, agla page scan kar rahe hain...")
-                                next_btn.click(force=True)
+                                # 🚀 ERROR FIX: JS Force Click Lagaya
+                                next_btn.evaluate("node => node.click()") 
                                 
                                 p_wait = time.time()
                                 while time.time() - p_wait < 10:
