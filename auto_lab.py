@@ -130,38 +130,68 @@ def inject_lab_weight_ghost(lab_data=None):
             bis_page.on("dialog", lambda dialog: dialog.accept())
 
             # ---------------------------------------------------------
-            # 🚀 NEW PM FIX: PRE-INJECTION SEQUENCE (Master Weights)
+            # 🚀 ULTRA-PRECISE PRE-INJECTION SEQUENCE (Master Weights)
             # ---------------------------------------------------------
             try:
+                # 1. SAMPLE DRAWN WEIGHT
                 if sample_wt and str(sample_wt) not in ["0", "0.0", "", "None"]:
                     print(f"⚖️ Injecting Sample Drawn Weight: {sample_wt}")
-                    sample_input = bis_page.locator("div").filter(has_text="Sample Drawn Weight").locator("input[type='text'], input[type='number']").first
+                    sample_input = bis_page.locator("input#num_scrap_weight").first
+                    
                     if sample_input.count() > 0:
-                        sample_input.evaluate("node => { node.removeAttribute('disabled'); node.removeAttribute('readonly'); }")
-                        sample_input.fill(str(sample_wt))
-                        time.sleep(0.5)
+                        # 🚨 BYPASS FOCUS STEALING: Direct JS Value Injection
+                        js_fill = f"""node => {{
+                            node.removeAttribute('disabled'); 
+                            node.removeAttribute('readonly');
+                            node.value = '{sample_wt}';
+                            node.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                            node.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                        }}"""
+                        sample_input.evaluate(js_fill)
+                        bis_page.wait_for_timeout(300)
                         
-                        sample_save_btn = bis_page.locator("div").filter(has_text="Sample Drawn Weight").locator("button, a, input[type='button']").filter(has_text="Save").first
+                        # Uske turant baad wala Save button dabe ga
+                        sample_save_btn = bis_page.locator("xpath=//input[@id='num_scrap_weight']/following::button[contains(., 'Save')][1]").first
                         if sample_save_btn.count() > 0:
-                            sample_save_btn.click(force=True)
-                            print("✅ Sample Drawn Weight Saved!")
-                            time.sleep(1.5) # Server process hone ka wait
+                            sample_save_btn.evaluate("node => node.click()")
+                            print("✅ Sample Drawn Weight Saved Successfully!")
+                            bis_page.wait_for_timeout(2500) # Server AJAX request ko process karne dega
+                        else:
+                            print("⚠️ Sample Weight ka Save button nahi mila!")
 
+                # 2. BUTTON WEIGHT
                 if button_wt and str(button_wt) not in ["0", "0.0", "", "None"]:
                     print(f"⚖️ Injecting Button Weight: {button_wt}")
-                    button_input = bis_page.locator("div").filter(has_text="Button Weight").locator("input[type='text'], input[type='number']").first
+                    
+                    button_input = bis_page.locator("input#buttonweight").first
+                    if button_input.count() == 0:
+                        button_input = bis_page.locator("xpath=//label[contains(., 'Button Weight')]/following::input[1]").first
+                    
                     if button_input.count() > 0:
-                        button_input.evaluate("node => { node.removeAttribute('disabled'); node.removeAttribute('readonly'); }")
-                        button_input.fill(str(button_wt))
-                        time.sleep(0.5)
+                        # 🚨 BYPASS FOCUS STEALING: Direct JS Value Injection
+                        js_fill = f"""node => {{
+                            node.removeAttribute('disabled'); 
+                            node.removeAttribute('readonly');
+                            node.value = '{button_wt}';
+                            node.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                            node.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                        }}"""
+                        button_input.evaluate(js_fill)
+                        bis_page.wait_for_timeout(300)
                         
-                        button_save_btn = bis_page.locator("div").filter(has_text="Button Weight").locator("button, a, input[type='button']").filter(has_text="Save").first
+                        button_save_btn = bis_page.locator("xpath=//input[@id='buttonweight']/following::button[contains(., 'Save')][1]").first
+                        if button_save_btn.count() == 0:
+                            button_save_btn = bis_page.locator("xpath=//label[contains(., 'Button Weight')]/following::button[contains(., 'Save')][1]").first
+                            
                         if button_save_btn.count() > 0:
-                            button_save_btn.click(force=True)
-                            print("✅ Button Weight Saved!")
-                            time.sleep(1.5) # Server process hone ka wait
+                            button_save_btn.evaluate("node => node.click()")
+                            print("✅ Button Weight Saved Successfully!")
+                            bis_page.wait_for_timeout(2500) # Wait for Server AJAX
+                        else:
+                            print("⚠️ Button Weight ka Save button nahi mila!")
+
             except Exception as e:
-                print(f"⚠️ Pre-Injection Warning: {e}")
+                print(f"⚠️ Pre-Injection Sequence Error: {e}")
             # ---------------------------------------------------------
 
             filled_count = 0
