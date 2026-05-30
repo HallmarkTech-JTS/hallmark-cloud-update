@@ -199,19 +199,59 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
                 tag_id, weight = str(item[0]).strip(), str(item[1]).strip()
                 
                 target_frame = None
-                for page in browser.contexts[0].pages:
-                    try:
-                        if page.locator("tr").filter(has=page.locator("td").get_by_text(tag_id, exact=True)).count() > 0:
-                            target_frame = page; break
-                    except: pass
-                    for frame in page.frames:
-                        try:
-                            if frame.locator("tr").filter(has=frame.locator("td").get_by_text(tag_id, exact=True)).count() > 0:
-                                target_frame = frame; break
-                        except: pass
-                    if target_frame: break
+                tag_found = False
 
-                if not target_frame: continue
+                # 🚀 SMART PAGINATION LOOP: Tag dhundhne ke liye Next page par jana
+                while True:
+                    # 1. Pehle current page/frame par tag dhundho
+                    for page in browser.contexts[0].pages:
+                        try:
+                            if page.locator("tr").filter(has=page.locator("td").get_by_text(tag_id, exact=True)).count() > 0:
+                                target_frame = page
+                                tag_found = True
+                                break
+                        except: pass
+                        
+                        if not tag_found:
+                            for frame in page.frames:
+                                try:
+                                    if frame.locator("tr").filter(has=frame.locator("td").get_by_text(tag_id, exact=True)).count() > 0:
+                                        target_frame = frame
+                                        tag_found = True
+                                        break
+                                except: pass
+                        if tag_found: break
+
+                    if tag_found:
+                        break # Tag mil gaya, search loop se bahar niklo
+
+                    # 2. Agar tag nahi mila, toh 'Next' button dhundho aur JS Click maaro
+                    next_btn_clicked = False
+                    for page in browser.contexts[0].pages:
+                        frames_to_check = [page] + page.frames
+                        for f in frames_to_check:
+                            try:
+                                # Screenshot ke hisab se exact locators add kiye hain
+                                next_btn = f.locator("a.paginate_button.next, a#tabWeight_next, li.next a, a:has-text('Next'), a:has-text('›')").last
+                                if next_btn.count() > 0:
+                                    btn_class = next_btn.get_attribute("class") or ""
+                                    is_disabled = "disabled" in btn_class or next_btn.get_attribute("aria-disabled") == "true" or next_btn.get_attribute("disabled") is not None
+                                    
+                                    if not is_disabled:
+                                        next_btn.evaluate("node => node.click()") # 🚀 JS Force Click
+                                        time.sleep(1.2) # Agla page load hone ka wait (1.2 sec)
+                                        next_btn_clicked = True
+                                        break
+                            except: pass
+                        if next_btn_clicked: break
+
+                    # Agar 'Next' button disable hai ya nahi mila (aakhri page aa gaya)
+                    if not next_btn_clicked:
+                        break
+
+                if not target_frame or not tag_found: 
+                    print(f"⚠️ Alert: Tag {tag_id} kisi bhi page par nahi mila, skip kar rahe hain.")
+                    continue
 
                 try:
                     row = target_frame.locator("tr").filter(has=target_frame.locator("td").get_by_text(tag_id, exact=True))
