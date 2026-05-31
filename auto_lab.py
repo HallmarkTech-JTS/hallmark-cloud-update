@@ -76,14 +76,17 @@ def generate_pro_lab_data(selected_jobs, purity_val, low_r, high_r, c1m2, c2m2):
             sample_drawn = round(random.uniform(310.0, 450.0), 3)
             button_wt = round(random.uniform(310.0, 450.0), 3)
             
+            # 🚀 GitHub ke liye 24-parameter query
             cursor.execute('''INSERT OR REPLACE INTO lab_results 
                               (job_id, sample_drawn_wt, button_wt, s1_m1, s1_ag, s1_cu, s1_pb, s1_m2, 
-                               s2_m1, s2_ag, s2_cu, s2_pb, s2_m2, c1_m1, c1_m2, c2_m1, c2_m2, remarks)
-                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                               s2_m1, s2_ag, s2_cu, s2_pb, s2_m2, c1_m1, c1_ag, c1_cu, c1_pb, c1_m2,
+                               c2_m1, c2_ag, c2_cu, c2_pb, c2_m2, remarks)
+                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                            (jc, sample_drawn, button_wt, 
                             m1s1, ag_s1, 0, 4, m2s1,
                             m1s2, ag_s2, 0, 4, m2s2,
-                            m1c1, c1m2_final, m1c2, c2m2_final, 'Auto Generated'))
+                            m1c1, c1m2_final, 14, 4, c1m2_final,
+                            m1c2, c2m2_final, 14, 4, c2m2_final, 'Auto Generated'))
         conn.commit()
         conn.close()
         return {"status": "success", "msg": f"✅ {len(selected_jobs)} Job Cards ke liye Lab Data successfully generate aur save ho gaya!"}
