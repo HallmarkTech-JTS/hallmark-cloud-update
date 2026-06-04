@@ -490,8 +490,8 @@ def process_selected_requests(selected_reqs, master_info):
                                 try:
                                     is_target = frame.evaluate("""() => {
                                         let text = document.body.innerText.toUpperCase();
-                                        let hasTable = document.querySelectorAll('table tbody tr').length > 0;
-                                        return hasTable && (text.includes('JOB CARD') || text.includes('QM JOB') || text.includes('ACTION'));
+let hasTable = document.querySelectorAll('table tbody tr').length > 0;
+return hasTable && (text.includes('JOB CARD') || text.includes('QM JOB') || text.includes('ACTION') || text.includes('XRF') || text.includes('SUBMITTED ARTICLES'));
                                     }""")
                                     if is_target:
                                         target_frame = frame
@@ -709,4 +709,141 @@ def process_selected_requests(selected_reqs, master_info):
             
     except Exception as e:
         logging.error(f"Selected Requests Scrape Error: {e}", exc_info=True)
+        return {"status": "error", "msg": str(e)}
+# ==============================================================
+# 🌟 5. NEW: SCRAPE REQUESTS FROM XRF PAGE (BACKUP FETCH)
+# ==============================================================
+def scrape_all_requests_from_xrf():
+    """XRF page ('Submitted Articles List') se Request aur Job data extract karna"""
+    global CANCEL_FETCH
+    CANCEL_FETCH = False
+    print("🌐 XRF Backup Page se data fetch kar rahe hain...")
+    
+    try:
+        with sync_playwright() as p:
+            try: browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
+            except: return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
+
+            # 🚀 Exact JS Logic for the XRF "Submitted Articles List" Table
+            js_code = """
+            () => {
+                let results = {};
+                let rows = document.querySelectorAll('table tbody tr');
+                if(rows.length === 0) return null; 
+                
+                let hasData = false;
+                for(let r of rows) {
+                    let links = r.querySelectorAll('a');
+                    let isXrfRow = false;
+                    for(let a of links) {
+                        if(a.innerText.trim().toUpperCase() === 'XRF') {
+                            isXrfRow = true;
+                            break;
+                        }
+                    }
+                    
+                    // Agar is row mein XRF button hai, tabhi ID nikalenge
+                    if (isXrfRow) {
+                        let cells = r.querySelectorAll('td');
+                        if(cells.length >= 3) {
+                            // Column 1 is usually Request No, Column 2 is Job No
+                            let req = cells[1].innerText.trim();
+                            let job = cells[2].innerText.trim();
+                            
+                            // Validate that they are numbers
+                            if(req && job && req.match(/\\d+/) && job.match(/\\d+/)) {
+                                if(!results[req]) results[req] = [];
+                                if(!results[req].includes(job)) results[req].push(job);
+                                hasData = true;
+                            }
+                        }
+                    }
+                }
+                return hasData ? results : null;
+            }
+            """
+            
+            target_frame = None
+            max_wait = 180 # 3 mins
+            start_time = time.time()
+            
+            print("⏳ XRF table load hone ka wait kar rahe hain...")
+            
+            while time.time() - start_time < max_wait:
+                if CANCEL_FETCH: break
+                for page in browser.contexts[0].pages:
+                    for frame in [page] + page.frames:
+                        try:
+                            res = frame.evaluate(js_code)
+                            if res: 
+                                target_frame = frame
+                                break
+                        except: pass
+                    if target_frame: break
+                if target_frame: break 
+                time.sleep(1) 
+
+            if CANCEL_FETCH:
+                try: browser.disconnect()
+                except: pass
+                return {"status": "error", "msg": "🛑 Process Cancelled by User."}
+
+            if not target_frame:
+                try: browser.disconnect()
+                except: pass
+                return {"status": "error", "msg": "⚠️ Timeout Error: Website par XRF Table Data load nahi hua!"}
+
+            all_data = {}
+            previous_data_state = None 
+
+            while True:
+                if CANCEL_FETCH:
+                    print("🛑 Fetching loop cancelled by user!")
+                    break
+
+                res = target_frame.evaluate(js_code)
+                if res == previous_data_state:
+                    print("🛑 Aakhri page aa gaya. Loop break kar rahe hain.")
+                    break
+                    
+                if res:
+                    for req, jobs in res.items():
+                        if req not in all_data: all_data[req] = []
+                        for j in jobs:
+                            if j not in all_data[req]: all_data[req].append(j)
+
+                previous_data_state = res 
+                
+                next_btn = target_frame.locator("a.paginate_button.next, li.next a, a:has-text('Next'), a:has-text('›'), a[title*='Next']").last
+                
+                if next_btn.count() > 0:
+                    btn_class = next_btn.get_attribute("class") or ""
+                    is_disabled = "disabled" in btn_class or next_btn.get_attribute("aria-disabled") == "true" or next_btn.get_attribute("disabled") is not None
+                    
+                    if not is_disabled:
+                        print("➡️ Agle panne (Next Page) par jaa rahe hain...")
+                        next_btn.evaluate("node => node.click()") 
+                        wait_start = time.time()
+                        while time.time() - wait_start < 10:
+                            if CANCEL_FETCH: break
+                            try:
+                                if target_frame.evaluate(js_code) != previous_data_state:
+                                    break
+                            except: pass
+                            time.sleep(0.5)
+                    else:
+                        break 
+                else:
+                    break
+
+            try: browser.disconnect()
+            except: pass
+            
+            if CANCEL_FETCH:
+                return {"status": "error", "msg": "🛑 Process Stopped."}
+
+            return {"status": "success", "data": all_data}
+            
+    except Exception as e:
+        logging.error(f"XRF Scrape Error: {e}", exc_info=True)
         return {"status": "error", "msg": str(e)}
