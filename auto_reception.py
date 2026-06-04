@@ -577,7 +577,8 @@ return hasTable && (text.includes('JOB CARD') || text.includes('QM JOB') || text
 
                     try:
                         with context.expect_page(timeout=10000) as new_page_info:
-                            view_btn.evaluate("node => node.click()")
+                            # 🚀 SMART FIX: Force it to open in a NEW TAB every time
+                            view_btn.evaluate("node => { node.setAttribute('target', '_blank'); node.click(); }")
                         new_page = new_page_info.value
                     except Exception as e:
                         print(f"⚠️ Naya tab kholne me dikkat: {e}")
