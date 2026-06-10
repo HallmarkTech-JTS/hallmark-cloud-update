@@ -380,15 +380,11 @@ def scrape_all_requests_from_main():
                                 target_frame = frame
                                 break
                         except: pass
-                    if target_frame: break
-                
+                    # ✅ FIXED: Properly indented breaks
+                    if target_frame:
+                        break 
                 if target_frame:
-                    break 
-                time.sleep(1)
-                    if target_frame: break
-                
-                if target_frame:
-                    break 
+                    break
                 time.sleep(1) 
 
             if CANCEL_FETCH:
@@ -502,10 +498,11 @@ def process_selected_requests(selected_reqs, master_info):
                         for page in context.pages:
                             for frame in [page] + page.frames:
                                 try:
+                                    # ✅ FIXED: Indentation of JS string improved for clarity
                                     is_target = frame.evaluate("""() => {
                                         let text = document.body.innerText.toUpperCase();
-let hasTable = document.querySelectorAll('table tbody tr').length > 0;
-return hasTable && (text.includes('JOB CARD') || text.includes('QM JOB') || text.includes('ACTION') || text.includes('XRF') || text.includes('SUBMITTED ARTICLES'));
+                                        let hasTable = document.querySelectorAll('table tbody tr').length > 0;
+                                        return hasTable && (text.includes('JOB CARD') || text.includes('QM JOB') || text.includes('ACTION') || text.includes('XRF') || text.includes('SUBMITTED ARTICLES'));
                                     }""")
                                     if is_target:
                                         target_frame = frame
@@ -760,30 +757,22 @@ def scrape_all_requests_from_xrf():
                 
                 let hasData = false;
                 for(let r of rows) {
-                    let links = r.querySelectorAll('a');
-                    let isXrfRow = false;
-                    for(let a of links) {
-                        if(a.innerText.trim().toUpperCase() === 'XRF') {
-                            isXrfRow = true;
-                            break;
-                        }
-                    }
+                    let rowText = r.innerText || "";
+                    // 🚀 FIX: Sirf exact numbers hi filter honge, spaces wagera nahi
+                    let numbers = rowText.match(/\\b\\d{8,}\\b/g) || [];
                     
-                    // Agar is row mein XRF button hai, tabhi ID nikalenge
-                    if (isXrfRow) {
-                        let cells = r.querySelectorAll('td');
-                        if(cells.length >= 3) {
-                            // Column 1 is usually Request No, Column 2 is Job No
-                            let req = cells[1].innerText.trim();
-                            let job = cells[2].innerText.trim();
-                            
-                            // Validate that they are numbers
-                            if(req && job && req.match(/\\d+/) && job.match(/\\d+/)) {
-                                if(!results[req]) results[req] = [];
-                                if(!results[req].includes(job)) results[req].push(job);
-                                hasData = true;
-                            }
-                        }
+                    if (numbers.length >= 2) {
+                        let req = String(numbers[0]).trim(); 
+                        let job = String(numbers[1]).trim(); 
+                        if(!results[req]) results[req] = [];
+                        if(!results[req].includes(job)) results[req].push(job);
+                        hasData = true;
+                    } else if (numbers.length === 1) {
+                        let job = String(numbers[0]).trim();
+                        let req = "UNKNOWN";
+                        if(!results[req]) results[req] = [];
+                        if(!results[req].includes(job)) results[req].push(job);
+                        hasData = true;
                     }
                 }
                 return hasData ? results : null;
