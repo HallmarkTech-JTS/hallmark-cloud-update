@@ -372,11 +372,19 @@ def scrape_all_requests_from_main():
                 for page in browser.contexts[0].pages:
                     for frame in [page] + page.frames:
                         try:
+                            # 🚀 SMART WAIT: Table load hone ka explicit wait karein pehle
+                            frame.wait_for_selector("table tbody tr", timeout=3000, state="attached")
+                            
                             res = frame.evaluate(js_code)
                             if res: 
                                 target_frame = frame
                                 break
                         except: pass
+                    if target_frame: break
+                
+                if target_frame:
+                    break 
+                time.sleep(1)
                     if target_frame: break
                 
                 if target_frame:
@@ -426,6 +434,12 @@ def scrape_all_requests_from_main():
                         print("➡️ Website ke agle panne (Next Page) par jaa rahe hain...")
                         # 🚀 ERROR FIX: JS Force Click Lagaya
                         next_btn.evaluate("node => node.click()") 
+                        
+                        # 🚀 NAYI LINES: Network idle hone ka aur table aane ka pakka wait
+                        try:
+                            target_frame.page.wait_for_load_state("networkidle", timeout=8000)
+                            target_frame.wait_for_selector("table tbody tr", state="visible", timeout=10000)
+                        except: pass
                         
                         wait_start = time.time()
                         while time.time() - wait_start < 10:
@@ -611,6 +625,14 @@ return hasTable && (text.includes('JOB CARD') || text.includes('QM JOB') || text
                     if not target_new_frame: 
                         target_new_frame = new_page 
 
+                    # 🚀 NAYA FIX: Tags wala table load hone ka wait karega (Aadha data miss nahi hoga)
+                    try:
+                        target_new_frame.wait_for_load_state("networkidle", timeout=5000)
+                        target_new_frame.wait_for_selector("table tbody tr", state="visible", timeout=15000)
+                    except:
+                        print("⚠️ Tags table aane me internet ki wajah se time lag raha hai...")
+                        pass
+
                     js_code_tags = """
                     () => {
                         let results = [];
@@ -705,6 +727,10 @@ return hasTable && (text.includes('JOB CARD') || text.includes('QM JOB') || text
             
             if CANCEL_FETCH:
                 return {"status": "error", "msg": f"🛑 Cancelled! Lakin pehle ke {total_jobs_saved} Jobs database me save ho chuke hain."}
+                
+            # 🚀 NAYA CHECK: Agar ek bhi job save nahi hua toh Error dikhaye
+            if total_jobs_saved == 0:
+                return {"status": "error", "msg": "⚠️ Data Fetch Fail! Ya toh page theek se load nahi hua, ya tags available nahi hain."}
                 
             return {"status": "success", "msg": f"✅ Website se Data Fetch ho gaya! {total_jobs_saved} Jobs Database mein save ho gaye."}
             

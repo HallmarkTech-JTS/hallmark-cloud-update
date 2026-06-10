@@ -227,12 +227,16 @@ def inject_lab_weight_ghost(lab_data=None):
                                 box = inputs.nth(idx)
                                 val_str = str(val).strip()
                                 if str(box.evaluate("node => node.value")).strip() != val_str:
-                                    box.evaluate("node => { node.removeAttribute('disabled'); node.removeAttribute('readonly'); }")
-                                    box.clear()
+                                    # 🚀 FIX: Key-by-key typing hata di hai, direct JS injection se 100% accuracy aayegi chahe net slow ho
+                                    js_fill = f"""node => {{
+                                        node.removeAttribute('disabled'); 
+                                        node.removeAttribute('readonly');
+                                        node.value = '{val_str}';
+                                        node.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                                        node.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                                    }}"""
+                                    box.evaluate(js_fill)
                                     bis_page.wait_for_timeout(random.randint(100, 300))
-                                    box.type(val_str, delay=random.randint(80, 150))
-                                    box.evaluate("node => node.dispatchEvent(new Event('input', { bubbles: true }))")
-                                    box.evaluate("node => node.dispatchEvent(new Event('change', { bubbles: true }))")
                                     return True
                             return False
 
