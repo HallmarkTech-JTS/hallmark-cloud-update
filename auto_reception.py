@@ -254,11 +254,61 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
                     continue
 
                 try:
-                    row = target_frame.locator("tr").filter(has=target_frame.locator("td").get_by_text(tag_id, exact=True))
+                    # 🚀 THE 100% STRICT MATCH FIX
+                    # S.No. (Column 1) ko ignore karega. Sirf Column 2 aur 3 me exact Tag match karega.
+                    row = target_frame.locator("tr").filter(
+                        has=target_frame.locator("td:nth-child(2), td:nth-child(3)").get_by_text(tag_id, exact=True)
+                    )
                     
                     if row.count() > 0:
                         target_row = row.first
                         weight_input = target_row.locator("input.weightCls, input.scan-input, input[name='articlWeight'], input:not([type='hidden']):not([type='checkbox'])").first
+                        
+                        if weight_input.count() > 0:
+                            # 🚀 CHECK IF ALREADY SAVED (WITH STRICT MATCH)
+                            is_disabled = weight_input.evaluate("node => node.disabled || node.readOnly")
+                            current_val = str(weight_input.evaluate("node => node.value")).strip()
+                            
+                            try:
+                                already_same = abs(float(current_val) - float(weight)) < 0.001
+                            except:
+                                already_same = (current_val == weight)
+
+                            if is_disabled and already_same:
+                                print(f"⏩ Exact Tag {tag_id} pehle se saved hai, skip kar rahe hain.")
+                                continue 
+                                
+                            if not already_same:
+                                js_inject = f"""node => {{
+                                    node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
+                                    node.removeAttribute('onpaste'); node.removeAttribute('oncopy'); 
+                                    node.removeAttribute('oncut'); node.removeAttribute('oncontextmenu'); 
+                                    node.value = '{weight}'; 
+                                    node.dispatchEvent(new Event('input', {{ bubbles: true }})); 
+                                    node.dispatchEvent(new Event('change', {{ bubbles: true }})); 
+                                }}"""
+                                weight_input.evaluate(js_inject)
+                                
+                                save_btn = target_row.locator("text='Save'").first
+                                if save_btn.is_visible():
+                                    main_page = target_frame if hasattr(target_frame, 'once') else target_frame.page
+                                    main_page.once("dialog", lambda dialog: dialog.accept())
+                                    save_btn.evaluate("node => node.click()") 
+                                    
+                                    # 🚀 NAYA: Save hone par rukega taaki portal overlap na ho
+                                    print(f"✅ Tag {tag_id} me {weight}g strict fill kar diya. Waiting...")
+                                    time.sleep(1.5) 
+                                    try:
+                                        main_page.wait_for_load_state("networkidle", timeout=4000)
+                                        target_frame.wait_for_selector("table tbody tr", state="visible", timeout=4000)
+                                    except: pass
+                                    
+                                    time.sleep(delay_ms / 1000.0)
+                                
+                                filled_count += 1
+                    else:
+                        print(f"⚠️ Tag {tag_id} screen par match nahi hua, skip kar diya.")
+                except Exception as e: print(f"⚠️ Error: {e}")
                         
                         if weight_input.count() > 0:
                             current_val = str(weight_input.evaluate("node => node.value")).strip()
@@ -373,7 +423,7 @@ def scrape_all_requests_from_main():
                     for frame in [page] + page.frames:
                         try:
                             # 🚀 SMART WAIT: Table load hone ka explicit wait karein pehle
-                            frame.wait_for_selector("table tbody tr", timeout=3000, state="attached")
+                            #frame.wait_for_selector("table tbody tr", timeout=3000, state="attached")
                             
                             res = frame.evaluate(js_code)
                             if res: 
