@@ -60,13 +60,25 @@ def inject_single_reception_tag(job_id, tag_id, weight):
                 except: pass
                 return {"status": "error", "msg": f"⚠️ Tag '{tag_id}' nahi mila."}
 
-            row = target_frame.locator("tr").filter(has=target_frame.locator("td").get_by_text(tag_id, exact=True))
+            # 🚀 THE 100% STRICT MATCH FIX
+            row = target_frame.locator("tr").filter(
+                has=target_frame.locator("td:nth-child(2), td:nth-child(3)").get_by_text(tag_id, exact=True)
+            )
             
             if row.count() > 0:
                 target_row = row.first
                 weight_input = target_row.locator("input.weightCls, input.scan-input, input[name='articlWeight'], input:not([type='hidden']):not([type='checkbox'])").first
                 
+                # 🚀 NAYA FIX: Agar Input box gayab hai, toh Edit button dhoondho
+                if weight_input.count() == 0:
+                    edit_btn = target_row.locator("[title*='Edit'], [title*='edit'], .fa-edit, .fa-pencil, a.edit, button.edit").first
+                    if edit_btn.count() > 0:
+                        edit_btn.evaluate("node => node.click()")
+                        time.sleep(1.0)
+                        weight_input = target_row.locator("input.weightCls, input.scan-input, input[name='articlWeight'], input:not([type='hidden']):not([type='checkbox'])").first
+
                 if weight_input.count() > 0:
+                    # 🚀 JABARDASTI LOCK TODNE WALA JS HACK
                     js_inject = f"""node => {{
                         node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
                         node.removeAttribute('onpaste'); node.removeAttribute('oncopy'); 
@@ -78,21 +90,31 @@ def inject_single_reception_tag(job_id, tag_id, weight):
                     }}"""
                     weight_input.evaluate(js_inject)
                     
-                    save_btn = target_row.locator("text='Save'").first
+                    save_btn = target_row.locator("text='Save', text='Update', [title*='Save'], [title*='Update'], .fa-save").first
                     if save_btn.is_visible():
                         main_page = target_frame if hasattr(target_frame, 'once') else target_frame.page
                         main_page.once("dialog", lambda dialog: dialog.accept())
-                        save_btn.evaluate("node => node.click()") # JS Click lagaya
+                        save_btn.evaluate("node => node.click()") 
                         time.sleep(1)
                         
                     try: browser.disconnect()
                     except: pass
                     return {"status": "success", "msg": f"✅ Tag '{tag_id}' Saved ({weight}g)"}
-                else: return {"status": "error", "msg": "⚠️ Input box nahi mila!"}
-            else: return {"status": "error", "msg": f"⚠️ Tag '{tag_id}' Editable list me nahi mila."}
+                else: 
+                    return {"status": "error", "msg": "⚠️ Input box ya Edit button dono nahi mile!"}
+            else: 
+                return {"status": "error", "msg": f"⚠️ Tag '{tag_id}' Editable list me nahi mila."}
     except Exception as e:
         logging.error(f"Single Inject Error: {e}", exc_info=True)
         return {"status": "error", "msg": f"⚠️ Error: {str(e)}"}
+
+
+# ==============================================================
+# 2. FAST DROPDOWN INJECTION 
+# ==============================================================
+def fast_inject_weight(job_id, tag_id, weight):
+    # Fast Injector ko bhi same strictly Single wale logic par point kar diya
+    return inject_single_reception_tag(job_id, tag_id, weight)
 
 
 # ==============================================================
