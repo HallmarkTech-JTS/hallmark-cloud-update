@@ -938,28 +938,26 @@ def scrape_all_requests_from_xrf():
 # 🌟 6. NEW: FETCH HUIDs FROM WEIGHING DESK PAGE (SMART SYNC)
 # ==============================================================
 def fetch_huids_from_page(job_id):
-    """Current open Weighing Desk page se Tag, Category aur HUID nikalna"""
+    """Current open Weighing Desk page se Tag, Category aur HUID nikalna (All Pages)"""
     global CANCEL_FETCH, ACTIVE_BROWSER
     print(f"🔍 Smart Fetching HUIDs/Data for Job: {job_id}...")
     try:
         with sync_playwright() as p:
             try: 
                 browser = p.chromium.connect_over_cdp(CDP_URL, timeout=3000)
-                
-                ACTIVE_BROWSER = browser       # 🔥 NAYI LINE
+                ACTIVE_BROWSER = browser
             except: return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
             
             target_frame = None
             actual_job_card = None
             
-            # 🚀 1. Find the exact 'Weighing Desk' table frame & Actual Job Card
+            # 1. Find the exact 'Weighing Desk' page & Actual Job Card
             for page in browser.contexts[0].pages:
                 for frame in [page] + page.frames:
                     try:
                         text = frame.locator("body").inner_text()
-                        if "Weighing Desk" in text or "tagIdCls" in frame.content():
+                        if "Weighing Desk" in text or "tabWeight_next" in frame.content():
                             target_frame = frame
-                            # Actual Job Card number website ki screen se nikalna
                             match = re.search(r'Job Card\s*Number\s*:\s*(\d+)', text, re.IGNORECASE)
                             if match: actual_job_card = match.group(1).strip()
                             break
@@ -969,9 +967,9 @@ def fetch_huids_from_page(job_id):
             if not target_frame:
                 try: browser.disconnect()
                 except: pass
-                return {"status": "error", "msg": "⚠️ Weighing Desk page screen par load nahi hui hai. Kripya BIS portal par sahi page kholen."}
+                return {"status": "error", "msg": "⚠️ Weighing Desk page screen par load nahi hui hai. Kripya BIS portal par सही page खोलें."}
 
-            # 🚀 2. Extract Data (Tags, Categories, HUIDs)
+            # 2. Extract Data (Tags, Categories, HUIDs) Logic
             js_code = """
             () => {
                 let data = [];
@@ -985,11 +983,11 @@ def fetch_huids_from_page(job_id):
                         let itemCat = cells[3].innerText.trim();
                         let huid = cells[4].innerText.trim();
                         
-                        if (tag && tag !== "" && tag.toUpperCase() !== "AHC TAG") {
+                        if (tag && tag !== "" && tag.toUpperCase() !== "AHC TAG" && !tag.includes("No data available")) {
                             data.push({
                                 "tag": tag,
                                 "category": itemCat,
-                                "purity": matCat, // Screenshot me 'Gold' likha hai
+                                "purity": matCat,
                                 "huid": (huid !== "-") ? huid : ""
                             });
                         }
@@ -998,30 +996,74 @@ def fetch_huids_from_page(job_id):
                 return data;
             }
             """
-            data = target_frame.evaluate(js_code)
+            
+            # 🚀 NAYA PAGINATION LOOP (Jo saare pages scan karega)
+            all_data = []
+            previous_page_data = None
+            
+            while True:
+                if CANCEL_FETCH: break
+                
+                # Current page ka data nikalo
+                current_data = target_frame.evaluate(js_code)
+                
+                # Agar data repeat ho raha hai (stuck), to loop tod do
+                if current_data == previous_page_data:
+                    break
+                    
+                # Naye (Unique) tags ko main list me jodo
+                if current_data and len(current_data) > 0:
+                    for item in current_data:
+                        if item not in all_data:
+                            all_data.append(item)
+                            
+                previous_page_data = current_data
+                
+                # 🚀 Next Button dhundho (Aapke Screenshot ke hisaab se ID #tabWeight_next hai)
+                next_btn = target_frame.locator("a#tabWeight_next, a.paginate_button.next").last
+                
+                if next_btn.count() > 0:
+                    btn_class = next_btn.get_attribute("class") or ""
+                    # Check karo ki button disable to nahi hai (Last page)
+                    if "disabled" not in btn_class and next_btn.get_attribute("aria-disabled") != "true":
+                        print(f"➡️ HUIDs: Agle page par jaa rahe hain...")
+                        next_btn.evaluate("node => node.click()") # Force Click
+                        
+                        # Data change hone ka intezaar karo (Max 5 second)
+                        wait_start = time.time()
+                        while time.time() - wait_start < 5:
+                            if CANCEL_FETCH: break
+                            try:
+                                if target_frame.evaluate(js_code) != previous_page_data:
+                                    break
+                            except: pass
+                            time.sleep(0.5)
+                    else:
+                        break # Next button disabled hai, aakhri page aa gaya
+                else:
+                    break # Next button mila hi nahi
+
             try: browser.disconnect()
             except: pass
             
-            if not data or len(data) == 0:
+            if not all_data or len(all_data) == 0:
                 return {"status": "error", "msg": "⚠️ Table me koi Tags nahi mile!"}
             
             if not actual_job_card:
                 actual_job_card = "UNKNOWN_JOB"
 
-            # 🚀 3. Check Match or Mismatch
+            # 3. Check Match or Mismatch
             if actual_job_card == job_id:
-                # Agar Job Card same hai, toh sirf HUIDs dictionary return karo (Old workflow)
-                huids_dict = {item['tag']: item['huid'] for item in data if item['huid']}
+                huids_dict = {item['tag']: item['huid'] for item in all_data if item['huid']}
                 if len(huids_dict) > 0:
-                    return {"status": "success", "data": huids_dict}
+                    return {"status": "success", "data": huids_dict, "msg": f"✅ {len(huids_dict)} HUIDs fetched!"}
                 else:
                     return {"status": "error", "msg": "⚠️ HUID column khali hai! Lagta hai abhi tak aapne HUID print nahi kiye hain."}
             else:
-                # 🚀 MISMATCH DETECTED! Pura data UI ko bhej do confirm karne ke liye
                 return {
                     "status": "mismatch", 
                     "actual_job": actual_job_card, 
-                    "tags_data": data,
+                    "tags_data": all_data,
                     "msg": f"Job card mismatch! Software: {job_id}, Website: {actual_job_card}"
                 }
     except Exception as e:
