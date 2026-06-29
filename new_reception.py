@@ -958,6 +958,7 @@ def fetch_huids_from_page(job_id):
                         text = frame.locator("body").inner_text()
                         if "Weighing Desk" in text or "tabWeight_next" in frame.content():
                             target_frame = frame
+                            import re
                             match = re.search(r'Job Card\s*Number\s*:\s*(\d+)', text, re.IGNORECASE)
                             if match: actual_job_card = match.group(1).strip()
                             break
@@ -997,9 +998,9 @@ def fetch_huids_from_page(job_id):
             }
             """
             
-            # 🚀 NAYA PAGINATION LOOP (Jo saare pages scan karega)
+            # 🚀 SOLID PAGINATION LOOP
+            import time
             all_data = []
-            previous_page_data = None
             
             while True:
                 if CANCEL_FETCH: break
@@ -1007,41 +1008,42 @@ def fetch_huids_from_page(job_id):
                 # Current page ka data nikalo
                 current_data = target_frame.evaluate(js_code)
                 
-                # Agar data repeat ho raha hai (stuck), to loop tod do
-                if current_data == previous_page_data:
-                    break
-                    
                 # Naye (Unique) tags ko main list me jodo
                 if current_data and len(current_data) > 0:
                     for item in current_data:
                         if item not in all_data:
                             all_data.append(item)
                             
-                previous_page_data = current_data
-                
-                # 🚀 Next Button dhundho (Aapke Screenshot ke hisaab se ID #tabWeight_next hai)
-                next_btn = target_frame.locator("a#tabWeight_next, a.paginate_button.next").last
+                # 🚀 Next Button dhundho (Aapki Image ke hisaab se id="tabWeight_next")
+                next_btn = target_frame.locator("a#tabWeight_next").last
                 
                 if next_btn.count() > 0:
                     btn_class = next_btn.get_attribute("class") or ""
-                    # Check karo ki button disable to nahi hai (Last page)
-                    if "disabled" not in btn_class and next_btn.get_attribute("aria-disabled") != "true":
-                        print(f"➡️ HUIDs: Agle page par jaa rahe hain...")
-                        next_btn.evaluate("node => node.click()") # Force Click
+                    
+                    # Agar button me 'disabled' class hai, matlab aakhri page aa gaya
+                    if "disabled" in btn_class or next_btn.get_attribute("aria-disabled") == "true":
+                        print("🛑 Last page reached.")
+                        break
                         
-                        # Data change hone ka intezaar karo (Max 5 second)
-                        wait_start = time.time()
-                        while time.time() - wait_start < 5:
-                            if CANCEL_FETCH: break
-                            try:
-                                if target_frame.evaluate(js_code) != previous_page_data:
-                                    break
-                            except: pass
-                            time.sleep(0.5)
-                    else:
-                        break # Next button disabled hai, aakhri page aa gaya
+                    print(f"➡️ HUIDs: Clicking Next Page...")
+                    next_btn.evaluate("node => node.click()") # JS Force Click
+                    
+                    # ⏳ YAHAN HAI ASLI FIX: DataTables ko naya data lane ke liye time do
+                    time.sleep(1.5) 
+                    
+                    # Agar internet slow hai, toh 5 second tak confirm karo ki table badli ya nahi
+                    wait_start = time.time()
+                    while time.time() - wait_start < 5:
+                        if CANCEL_FETCH: break
+                        try:
+                            check_data = target_frame.evaluate(js_code)
+                            if check_data != current_data:
+                                break # Data badal gaya, loop tod do
+                        except: pass
+                        time.sleep(0.5)
                 else:
-                    break # Next button mila hi nahi
+                    print("⚠️ Next button not found.")
+                    break
 
             try: browser.disconnect()
             except: pass
@@ -1056,7 +1058,7 @@ def fetch_huids_from_page(job_id):
             if actual_job_card == job_id:
                 huids_dict = {item['tag']: item['huid'] for item in all_data if item['huid']}
                 if len(huids_dict) > 0:
-                    return {"status": "success", "data": huids_dict, "msg": f"✅ {len(huids_dict)} HUIDs fetched!"}
+                    return {"status": "success", "data": huids_dict, "msg": f"✅ {len(huids_dict)} HUIDs fetched from multiple pages!"}
                 else:
                     return {"status": "error", "msg": "⚠️ HUID column khali hai! Lagta hai abhi tak aapne HUID print nahi kiye hain."}
             else:
