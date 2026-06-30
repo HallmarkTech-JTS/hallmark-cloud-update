@@ -159,18 +159,17 @@ def fast_inject_weight(job_id, tag_id, weight):
 
 
 # ==============================================================
-# 3. FULL AUTO INJECTION (ULTRA FAST & SMART)
+# 3. FULL AUTO INJECTION (DYNAMIC REFRESH PRO)
 # ==============================================================
-def inject_reception_weight_ghost(job_id, job_data, delay_ms=400): # Thoda fast delay
+def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
     global CANCEL_FETCH
     CANCEL_FETCH = False
     
     if not job_data: return "⚠️ डेटाबेस खाली है।"
-    print(f"🚀 Ultra-Fast Auto Injection Started (Speed: {delay_ms}ms)... Job: {job_id}")
+    print(f"🚀 Dynamic Fast Injection Started (Speed: {delay_ms}ms)... Job: {job_id}")
 
-    # 1. SMART DATA STRUCTURE: O(1) Search ke liye List ko Dictionary (Hash Map) banayein
+    # Hash Map (O(1) Search)
     tag_map = {str(item[0]).strip(): str(item[1]).strip() for item in job_data}
-    total_tags = len(tag_map)
     filled_count = 0
 
     try:
@@ -178,7 +177,6 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400): # Thoda fast 
             try: browser = p.chromium.connect_over_cdp(CDP_URL)
             except: return "⚠️ ब्राउज़र ओपन नहीं है!"
 
-            # 2. BROWSER FRAME SEARCH (Sirf ek baar dhoondhega, har tag ke liye nahi)
             target_frame = None
             for page in browser.contexts[0].pages:
                 for frame in [page] + page.frames:
@@ -193,7 +191,7 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400): # Thoda fast 
                 except: pass
                 return f"❌ Wrong Page! Site par ID '{job_id}' open nahi hai."
 
-            # Page ko force first page par le aao (taaki data na chhute)
+            # Page ko first page par force karna
             try:
                 first_btn = target_frame.locator("a.paginate_button.first, li.first a, a:has-text('First'), a:has-text('«')").first
                 if first_btn.count() > 0 and "disabled" not in (first_btn.get_attribute("class") or ""):
@@ -201,58 +199,70 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400): # Thoda fast 
                     time.sleep(1)
             except: pass
 
-            # 3. PAGE-BY-PAGE PROCESSING LOOP (Browser ko crash hone se rokiyega)
+            # 🚀 MAIN LOOP: Jab tak dictionary me tags hain
             while tag_map and not CANCEL_FETCH:
                 
-                # Table load hone ka wait karein
                 try: target_frame.wait_for_selector("td.tagIdCls", timeout=3000)
                 except: pass
                 
-                # Current page ke saare Tag IDs nikal lo
-                tag_cells = target_frame.locator("td.tagIdCls").all()
+                page_has_matching_tags = True
                 
-                for cell in tag_cells:
-                    if CANCEL_FETCH: break
-                    if not tag_map: break # Agar dictionary khali ho gayi, loop band
+                # 🚀 INNER LOOP: Current page ko tab tak process karo jab tak naye tags aate rahein
+                while page_has_matching_tags and tag_map and not CANCEL_FETCH:
+                    
+                    # 1. Page ke saare visible tags ka TAZA (fresh) data nikalo
+                    current_visible_tags = target_frame.locator("td.tagIdCls").all_inner_texts()
+                    current_visible_tags = [t.strip() for t in current_visible_tags if t.strip()]
+                    
+                    # 2. Check karo ki in visible tags me se kitne hamare target hain
+                    tags_to_process = [t for t in current_visible_tags if t in tag_map]
+                    
+                    if not tags_to_process:
+                        # Page par koi matching tag nahi bacha, loop todo aur Next dabao
+                        page_has_matching_tags = False 
+                        break
+                        
+                    # 3. Sirf pehle matching tag ko pakdo (Kyunki save ke baad page update hoga)
+                    target_tag = tags_to_process[0]
+                    weight = tag_map[target_tag]
                     
                     try:
-                        current_tag = cell.inner_text().strip()
+                        # Row dhundho aur input box me weight dalo
+                        row = target_frame.locator("tr").filter(has=target_frame.locator("td.tagIdCls").get_by_text(target_tag, exact=True)).first
+                        weight_input = row.locator("input.weightCls, input.scan-input, input[name='articlWeight'], input:not([type='hidden']):not([type='checkbox'])").first
                         
-                        # Agar yeh tag hamare target list me hai
-                        if current_tag in tag_map:
-                            weight = tag_map[current_tag]
+                        if weight_input.count() > 0:
+                            js_inject = f"""node => {{
+                                node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
+                                node.removeAttribute('onpaste'); node.removeAttribute('oncopy'); 
+                                node.removeAttribute('oncut'); node.removeAttribute('oncontextmenu'); 
+                                node.value = '{weight}'; 
+                                node.dispatchEvent(new Event('input', {{ bubbles: true }})); 
+                                node.dispatchEvent(new Event('change', {{ bubbles: true }})); 
+                            }}"""
+                            weight_input.evaluate(js_inject)
                             
-                            # Row dhundho aur input field extract karo
-                            row = target_frame.locator("tr").filter(has=target_frame.locator("td.tagIdCls").get_by_text(current_tag, exact=True)).first
-                            weight_input = row.locator("input.weightCls, input.scan-input, input[name='articlWeight'], input:not([type='hidden']):not([type='checkbox'])").first
+                            save_btn = row.locator("text='Save'").first
+                            if save_btn.is_visible():
+                                main_page = target_frame if hasattr(target_frame, 'once') else target_frame.page
+                                main_page.once("dialog", lambda dialog: dialog.accept())
+                                save_btn.evaluate("node => node.click()")
+                                
+                                # ⏱️ Naya tag load hone ka wait karein
+                                time.sleep((delay_ms / 1000.0) + 0.3) 
                             
-                            if weight_input.count() > 0:
-                                js_inject = f"""node => {{
-                                    node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
-                                    node.removeAttribute('onpaste'); node.removeAttribute('oncopy'); 
-                                    node.removeAttribute('oncut'); node.removeAttribute('oncontextmenu'); 
-                                    node.value = '{weight}'; 
-                                    node.dispatchEvent(new Event('input', {{ bubbles: true }})); 
-                                    node.dispatchEvent(new Event('change', {{ bubbles: true }})); 
-                                }}"""
-                                weight_input.evaluate(js_inject)
-                                
-                                save_btn = row.locator("text='Save'").first
-                                if save_btn.is_visible():
-                                    main_page = target_frame if hasattr(target_frame, 'once') else target_frame.page
-                                    main_page.once("dialog", lambda dialog: dialog.accept())
-                                    save_btn.evaluate("node => node.click()")
-                                    time.sleep(delay_ms / 1000.0) # Server ko block hone se bachane ke liye chhota rest
-                                
-                                filled_count += 1
-                                del tag_map[current_tag] # ✅ Save hone ke baad dict se delete kar do, jisse speed badhti rahe
+                            filled_count += 1
+                            del tag_map[target_tag] # Tag ko list se hatao taaki wapas process na ho
                     except Exception as e:
-                        print(f"⚠️ Tag Error (Skipping): {e}")
+                        print(f"⚠️ Error with Tag {target_tag}: {e}")
+                        # Agar error aayi toh ise map se hata do taaki infinite loop me na fanse
+                        if target_tag in tag_map: del tag_map[target_tag]
 
+                # Agar sab tag khatam ho gaye, toh Next click karne ki zaroorat nahi
                 if not tag_map or CANCEL_FETCH:
-                    break # Agar sab fill ho gaye toh agle page par jane ki zaroorat nahi
+                    break
                 
-                # 4. SMART NEXT PAGE LOGIC
+                # 4. SMART NEXT PAGE LOGIC (Jab current page completely blank/unmatched ho jaye)
                 next_btn_clicked = False
                 next_btn = target_frame.locator("a.paginate_button.next, a#tabWeight_next, li.next a, a:has-text('Next'), a:has-text('›')").last
                 
@@ -265,7 +275,6 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400): # Thoda fast 
                         time.sleep(1.2) # Agla page load hone de
                         next_btn_clicked = True
                 
-                # Agar Next button disabled hai ya nahi mila (Aakhri page par aa gaye)
                 if not next_btn_clicked:
                     print("🛑 End of pages reached.")
                     break
@@ -276,9 +285,8 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400): # Thoda fast 
             if CANCEL_FETCH:
                 return f"🛑 STOPPED! {filled_count} Tags Save hone ke baad process rok di gayi."
             
-            # Missing tags report
             if tag_map:
-                print(f"⚠️ {len(tag_map)} tags page par mile hi nahi: {list(tag_map.keys())}")
+                print(f"⚠️ {len(tag_map)} tags page par mile hi nahi.")
                 return f"✅ Partial Success: {filled_count} save huye, par {len(tag_map)} tags nahi mile."
                 
             return f"✅ 100% Success! Saare {filled_count} Tags FAST Save kar diye gaye."
@@ -286,7 +294,6 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400): # Thoda fast 
     except Exception as e:
         logging.error(f"Auto Inject Error: {e}", exc_info=True)
         return f"⚠️ Error: {e}"
-
 
 # ==============================================================
 # 4. DATA SCRAPING & WAIT FOR JOB CARD
