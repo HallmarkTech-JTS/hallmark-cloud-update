@@ -159,110 +159,74 @@ def fast_inject_weight(job_id, tag_id, weight):
 
 
 # ==============================================================
-# 3. FULL AUTO INJECTION (Poori list ek sath)
+# 3. FULL AUTO INJECTION (ULTRA FAST & SMART)
 # ==============================================================
-def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
+def inject_reception_weight_ghost(job_id, job_data, delay_ms=400): # Thoda fast delay
     global CANCEL_FETCH
     CANCEL_FETCH = False
     
     if not job_data: return "⚠️ डेटाबेस खाली है।"
-    print(f"👻 Auto Injection Started (Speed: {delay_ms}ms)... Job: {job_id}")
+    print(f"🚀 Ultra-Fast Auto Injection Started (Speed: {delay_ms}ms)... Job: {job_id}")
+
+    # 1. SMART DATA STRUCTURE: O(1) Search ke liye List ko Dictionary (Hash Map) banayein
+    tag_map = {str(item[0]).strip(): str(item[1]).strip() for item in job_data}
+    total_tags = len(tag_map)
+    filled_count = 0
 
     try:
         with sync_playwright() as p:
             try: browser = p.chromium.connect_over_cdp(CDP_URL)
             except: return "⚠️ ब्राउज़र ओपन नहीं है!"
 
-            job_matched = False
+            # 2. BROWSER FRAME SEARCH (Sirf ek baar dhoondhega, har tag ke liye nahi)
+            target_frame = None
             for page in browser.contexts[0].pages:
-                try:
-                    if job_id in page.locator("body").inner_text(): job_matched = True; break
-                except: pass
-                for frame in page.frames:
+                for frame in [page] + page.frames:
                     try:
-                        if job_id in frame.locator("body").inner_text(): job_matched = True; break
+                        if job_id in frame.locator("body").inner_text():
+                            target_frame = frame; break
                     except: pass
-                if job_matched: break
+                if target_frame: break
                 
-            if not job_matched:
+            if not target_frame:
                 try: browser.disconnect()
                 except: pass
                 return f"❌ Wrong Page! Site par ID '{job_id}' open nahi hai."
 
-            filled_count = 0
-            for item in job_data:
-                # 🚀 ENTERPRISE CANCEL SWITCH CHECK
-                if CANCEL_FETCH:
-                    print("🛑 User Cancelled Auto Injection!")
-                    break
+            # Page ko force first page par le aao (taaki data na chhute)
+            try:
+                first_btn = target_frame.locator("a.paginate_button.first, li.first a, a:has-text('First'), a:has-text('«')").first
+                if first_btn.count() > 0 and "disabled" not in (first_btn.get_attribute("class") or ""):
+                    first_btn.evaluate("node => node.click()")
+                    time.sleep(1)
+            except: pass
 
-                tag_id, weight = str(item[0]).strip(), str(item[1]).strip()
+            # 3. PAGE-BY-PAGE PROCESSING LOOP (Browser ko crash hone se rokiyega)
+            while tag_map and not CANCEL_FETCH:
                 
-                target_frame = None
-                tag_found = False
-
-                # 🚀 SMART PAGINATION LOOP: Tag dhundhne ke liye Next page par jana
-                while True:
-                    # 1. Pehle current page/frame par tag dhundho
-                    for page in browser.contexts[0].pages:
-                        try:
-                            if page.locator("tr").filter(has=page.locator("td.tagIdCls").get_by_text(tag_id, exact=True)).count() > 0:
-                                target_frame = page
-                                tag_found = True
-                                break
-                        except: pass
-                        
-                        if not tag_found:
-                            for frame in page.frames:
-                                try:
-                                    if frame.locator("tr").filter(has=frame.locator("td.tagIdCls").get_by_text(tag_id, exact=True)).count() > 0:
-                                        target_frame = frame
-                                        tag_found = True
-                                        break
-                                except: pass
-                        if tag_found: break
-
-                    if tag_found:
-                        break # Tag mil gaya, search loop se bahar niklo
-
-                    # 2. Agar tag nahi mila, toh 'Next' button dhundho aur JS Click maaro
-                    next_btn_clicked = False
-                    for page in browser.contexts[0].pages:
-                        frames_to_check = [page] + page.frames
-                        for f in frames_to_check:
-                            try:
-                                # Screenshot ke hisab se exact locators add kiye hain
-                                next_btn = f.locator("a.paginate_button.next, a#tabWeight_next, li.next a, a:has-text('Next'), a:has-text('›')").last
-                                if next_btn.count() > 0:
-                                    btn_class = next_btn.get_attribute("class") or ""
-                                    is_disabled = "disabled" in btn_class or next_btn.get_attribute("aria-disabled") == "true" or next_btn.get_attribute("disabled") is not None
-                                    
-                                    if not is_disabled:
-                                        next_btn.evaluate("node => node.click()") # 🚀 JS Force Click
-                                        time.sleep(1.2) # Agla page load hone ka wait (1.2 sec)
-                                        next_btn_clicked = True
-                                        break
-                            except: pass
-                        if next_btn_clicked: break
-
-                    # Agar 'Next' button disable hai ya nahi mila (aakhri page aa gaya)
-                    if not next_btn_clicked:
-                        break
-
-                if not target_frame or not tag_found: 
-                    print(f"⚠️ Alert: Tag {tag_id} kisi bhi page par nahi mila, skip kar rahe hain.")
-                    continue
-
-                try:
-                    row = target_frame.locator("tr").filter(has=target_frame.locator("td.tagIdCls").get_by_text(tag_id, exact=True))
+                # Table load hone ka wait karein
+                try: target_frame.wait_for_selector("td.tagIdCls", timeout=3000)
+                except: pass
+                
+                # Current page ke saare Tag IDs nikal lo
+                tag_cells = target_frame.locator("td.tagIdCls").all()
+                
+                for cell in tag_cells:
+                    if CANCEL_FETCH: break
+                    if not tag_map: break # Agar dictionary khali ho gayi, loop band
                     
-                    if row.count() > 0:
-                        target_row = row.first
-                        weight_input = target_row.locator("input.weightCls, input.scan-input, input[name='articlWeight'], input:not([type='hidden']):not([type='checkbox'])").first
+                    try:
+                        current_tag = cell.inner_text().strip()
                         
-                        if weight_input.count() > 0:
-                            current_val = str(weight_input.evaluate("node => node.value")).strip()
-                            if current_val != weight:
+                        # Agar yeh tag hamare target list me hai
+                        if current_tag in tag_map:
+                            weight = tag_map[current_tag]
+                            
+                            # Row dhundho aur input field extract karo
+                            row = target_frame.locator("tr").filter(has=target_frame.locator("td.tagIdCls").get_by_text(current_tag, exact=True)).first
+                            weight_input = row.locator("input.weightCls, input.scan-input, input[name='articlWeight'], input:not([type='hidden']):not([type='checkbox'])").first
+                            
+                            if weight_input.count() > 0:
                                 js_inject = f"""node => {{
                                     node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
                                     node.removeAttribute('onpaste'); node.removeAttribute('oncopy'); 
@@ -273,22 +237,52 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
                                 }}"""
                                 weight_input.evaluate(js_inject)
                                 
-                                save_btn = target_row.locator("text='Save'").first
+                                save_btn = row.locator("text='Save'").first
                                 if save_btn.is_visible():
                                     main_page = target_frame if hasattr(target_frame, 'once') else target_frame.page
                                     main_page.once("dialog", lambda dialog: dialog.accept())
-                                    save_btn.evaluate("node => node.click()") # JS Click lagaya
-                                    time.sleep(delay_ms / 1000.0)
+                                    save_btn.evaluate("node => node.click()")
+                                    time.sleep(delay_ms / 1000.0) # Server ko block hone se bachane ke liye chhota rest
                                 
                                 filled_count += 1
-                except Exception as e: print(f"⚠️ Error: {e}")
+                                del tag_map[current_tag] # ✅ Save hone ke baad dict se delete kar do, jisse speed badhti rahe
+                    except Exception as e:
+                        print(f"⚠️ Tag Error (Skipping): {e}")
+
+                if not tag_map or CANCEL_FETCH:
+                    break # Agar sab fill ho gaye toh agle page par jane ki zaroorat nahi
+                
+                # 4. SMART NEXT PAGE LOGIC
+                next_btn_clicked = False
+                next_btn = target_frame.locator("a.paginate_button.next, a#tabWeight_next, li.next a, a:has-text('Next'), a:has-text('›')").last
+                
+                if next_btn.count() > 0:
+                    btn_class = next_btn.get_attribute("class") or ""
+                    is_disabled = "disabled" in btn_class or next_btn.get_attribute("aria-disabled") == "true" or next_btn.get_attribute("disabled") is not None
+                    
+                    if not is_disabled:
+                        next_btn.evaluate("node => node.click()")
+                        time.sleep(1.2) # Agla page load hone de
+                        next_btn_clicked = True
+                
+                # Agar Next button disabled hai ya nahi mila (Aakhri page par aa gaye)
+                if not next_btn_clicked:
+                    print("🛑 End of pages reached.")
+                    break
 
             try: browser.disconnect() 
             except: pass
             
             if CANCEL_FETCH:
                 return f"🛑 STOPPED! {filled_count} Tags Save hone ke baad process rok di gayi."
-            return f"✅ Success! {filled_count} Tags Save kar diye gaye."
+            
+            # Missing tags report
+            if tag_map:
+                print(f"⚠️ {len(tag_map)} tags page par mile hi nahi: {list(tag_map.keys())}")
+                return f"✅ Partial Success: {filled_count} save huye, par {len(tag_map)} tags nahi mile."
+                
+            return f"✅ 100% Success! Saare {filled_count} Tags FAST Save kar diye gaye."
+            
     except Exception as e:
         logging.error(f"Auto Inject Error: {e}", exc_info=True)
         return f"⚠️ Error: {e}"
