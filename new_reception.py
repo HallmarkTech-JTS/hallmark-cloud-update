@@ -257,7 +257,7 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
 
 
 # ==============================================================
-# 4. SCRAPE ALL REQUESTS FROM MAIN PAGE (Safe Legacy Extract)
+# 4. SCRAPE ALL REQUESTS FROM MAIN PAGE (Permanent Header Logic)
 # ==============================================================
 def scrape_all_requests_from_main():
     global CANCEL_FETCH, ACTIVE_BROWSER
@@ -271,30 +271,52 @@ def scrape_all_requests_from_main():
                 ACTIVE_BROWSER = browser
             except: return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
 
-            # 🚀 USER'S ORIGINAL SAFE JS CODE
+            # 🚀 PERMANENT FIX: Table ke headers padh kar exact column pakdega
             js_code = """
             () => {
                 let results = {};
-                let rows = document.querySelectorAll('table tbody tr');
-                if(rows.length === 0) return null; 
-                
                 let hasData = false;
-                for(let r of rows) {
-                    let rowText = r.innerText || "";
-                    let numbers = rowText.match(/\\b\\d{8,}\\b/g);
+                let tables = document.querySelectorAll('table');
+                
+                for (let t of tables) {
+                    // 1. Table ki Header (Titles) Nikalo
+                    let headers = Array.from(t.querySelectorAll('th, thead td')).map(x => x.innerText.trim().toUpperCase());
+                    if (headers.length === 0) {
+                        let firstRow = t.querySelector('tr');
+                        if(firstRow) headers = Array.from(firstRow.querySelectorAll('td')).map(x => x.innerText.trim().toUpperCase());
+                    }
                     
-                    if (numbers && numbers.length >= 2) {
-                        let req = numbers[0]; 
-                        let job = numbers[1]; 
-                        if(!results[req]) results[req] = [];
-                        if(!results[req].includes(job)) results[req].push(job);
-                        hasData = true;
-                    } else if (numbers && numbers.length === 1) {
-                        let job = numbers[0];
-                        let req = "UNKNOWN";
-                        if(!results[req]) results[req] = [];
-                        if(!results[req].includes(job)) results[req].push(job);
-                        hasData = true;
+                    // 2. Header ke naam se Column Number dhoondo
+                    let reqIdx = headers.findIndex(h => h.includes('REQUEST NO') || h.includes('REQ NO') || h.includes('REQUEST'));
+                    let jobIdx = headers.findIndex(h => h.includes('JOB CARD') || h.includes('JOB NO'));
+                    
+                    // Agar header na mile to default set karo (Main Page me Request 1st aur Job 3rd me hota hai)
+                    if (reqIdx === -1) reqIdx = 0; 
+                    if (jobIdx === -1) jobIdx = 2; 
+
+                    // 3. Exact Column se Data Nikalo (Bina length check kiye)
+                    let rows = t.querySelectorAll('tbody tr');
+                    for (let r of rows) {
+                        let cells = r.querySelectorAll('td');
+                        if (cells.length > Math.max(reqIdx, jobIdx)) {
+                            let reqText = cells[reqIdx].innerText.trim();
+                            let jobText = cells[jobIdx].innerText.trim();
+                            
+                            if (jobText.includes("No data")) continue;
+
+                            // Sirf numbers filter karo
+                            let reqMatch = reqText.match(/\\d+/);
+                            let jobMatch = jobText.match(/\\d+/);
+                            
+                            let req = reqMatch ? reqMatch[0] : "UNKNOWN";
+                            let job = jobMatch ? jobMatch[0] : null;
+                            
+                            if (job) {
+                                if (!results[req]) results[req] = [];
+                                if (!results[req].includes(job)) results[req].push(job);
+                                hasData = true;
+                            }
+                        }
                     }
                 }
                 return hasData ? results : null;
@@ -346,7 +368,6 @@ def scrape_all_requests_from_main():
                     if "disabled" not in btn_class and next_btn.get_attribute("aria-disabled") != "true":
                         next_btn.evaluate("node => node.click()") 
                         
-                        # 🚀 FAST POLLING WAIT
                         t_wait = time.time()
                         while time.time() - t_wait < 15:
                             if CANCEL_FETCH: break
@@ -364,7 +385,6 @@ def scrape_all_requests_from_main():
             return {"status": "success", "data": all_data}
             
     except Exception as e: return {"status": "error", "msg": str(e)}
-
 
 # ==============================================================
 # 5. PROCESS SELECTED REQUESTS (QM VIEW & LOT SPLITTER)
@@ -572,7 +592,7 @@ def process_selected_requests(selected_reqs, master_info):
 
 
 # ==============================================================
-# 6. SCRAPE REQUESTS FROM XRF PAGE (BACKUP FETCH)
+# 6. SCRAPE REQUESTS FROM XRF PAGE (Permanent Header Logic)
 # ==============================================================
 def scrape_all_requests_from_xrf():
     global CANCEL_FETCH, ACTIVE_BROWSER
@@ -585,30 +605,48 @@ def scrape_all_requests_from_xrf():
                 ACTIVE_BROWSER = browser
             except: return {"status": "error", "msg": "⚠️ Secure Browser open nahi hai!"}
 
-            # 🚀 USER'S ORIGINAL XRF JS CODE
+            # 🚀 PERMANENT FIX: Header se column dhoondhna
             js_code = """
             () => {
                 let results = {};
-                let rows = document.querySelectorAll('table tbody tr');
-                if(rows.length === 0) return null; 
-                
                 let hasData = false;
-                for(let r of rows) {
-                    let rowText = r.innerText || "";
-                    let numbers = rowText.match(/\\b\\d{8,}\\b/g) || [];
+                let tables = document.querySelectorAll('table');
+                
+                for (let t of tables) {
+                    let headers = Array.from(t.querySelectorAll('th, thead td')).map(x => x.innerText.trim().toUpperCase());
+                    if (headers.length === 0) {
+                        let firstRow = t.querySelector('tr');
+                        if(firstRow) headers = Array.from(firstRow.querySelectorAll('td')).map(x => x.innerText.trim().toUpperCase());
+                    }
                     
-                    if (numbers.length >= 2) {
-                        let req = String(numbers[0]).trim(); 
-                        let job = String(numbers[1]).trim(); 
-                        if(!results[req]) results[req] = [];
-                        if(!results[req].includes(job)) results[req].push(job);
-                        hasData = true;
-                    } else if (numbers.length === 1) {
-                        let job = String(numbers[0]).trim();
-                        let req = "UNKNOWN";
-                        if(!results[req]) results[req] = [];
-                        if(!results[req].includes(job)) results[req].push(job);
-                        hasData = true;
+                    let reqIdx = headers.findIndex(h => h.includes('REQUEST NO') || h.includes('REQ NO') || h.includes('REQUEST'));
+                    let jobIdx = headers.findIndex(h => h.includes('JOB CARD') || h.includes('JOB NO'));
+                    
+                    // XRF Page par Job Card 2nd column me hota hai (index 1)
+                    if (reqIdx === -1) reqIdx = 0; 
+                    if (jobIdx === -1) jobIdx = 1; 
+
+                    let rows = t.querySelectorAll('tbody tr');
+                    for (let r of rows) {
+                        let cells = r.querySelectorAll('td');
+                        if (cells.length > Math.max(reqIdx, jobIdx)) {
+                            let reqText = cells[reqIdx].innerText.trim();
+                            let jobText = cells[jobIdx].innerText.trim();
+                            
+                            if (jobText.includes("No data")) continue;
+
+                            let reqMatch = reqText.match(/\\d+/);
+                            let jobMatch = jobText.match(/\\d+/);
+                            
+                            let req = reqMatch ? reqMatch[0] : "UNKNOWN";
+                            let job = jobMatch ? jobMatch[0] : null;
+                            
+                            if (job) {
+                                if (!results[req]) results[req] = [];
+                                if (!results[req].includes(job)) results[req].push(job);
+                                hasData = true;
+                            }
+                        }
                     }
                 }
                 return hasData ? results : null;
@@ -656,7 +694,6 @@ def scrape_all_requests_from_xrf():
                     if "disabled" not in btn_class and next_btn.get_attribute("aria-disabled") != "true":
                         next_btn.evaluate("node => node.click()") 
                         
-                        # 🚀 FAST POLLING WAIT
                         t_wait = time.time()
                         while time.time() - t_wait < 15:
                             if CANCEL_FETCH: break
@@ -674,7 +711,6 @@ def scrape_all_requests_from_xrf():
             return {"status": "success", "data": all_data}
             
     except Exception as e: return {"status": "error", "msg": str(e)}
-
 
 # ==============================================================
 # 7. FETCH HUIDs FROM WEIGHING DESK PAGE
