@@ -463,7 +463,7 @@ def process_selected_requests(selected_reqs, master_info):
     except Exception as e: return {"status": "error", "msg": str(e)}
 
 # ==============================================================
-# 6. FETCH HUIDs FROM WEIGHING DESK PAGE (FAST POLLING & LOT FIX)
+# 🌟 6. NEW: FETCH HUIDs FROM WEIGHING DESK PAGE (100% FIXED)
 # ==============================================================
 def fetch_huids_from_page(job_id):
     global CANCEL_FETCH, ACTIVE_BROWSER
@@ -486,6 +486,7 @@ def fetch_huids_from_page(job_id):
                         text = frame.locator("body").inner_text()
                         if "Weighing Desk" in text or "tabWeight_next" in frame.content():
                             target_frame = frame
+                            import re
                             match = re.search(r'Job Card\s*Number\s*:\s*(\d+)', text, re.IGNORECASE)
                             if match: actual_job_card = match.group(1).strip()
                             break
@@ -500,9 +501,7 @@ def fetch_huids_from_page(job_id):
             js_code = """
             () => {
                 let data = [];
-                let rows = document.querySelectorAll('table#tabweight tbody tr');
-                if(rows.length === 0) { rows = document.querySelectorAll('table tbody tr'); }
-                
+                let rows = document.querySelectorAll('table tbody tr');
                 for (let r of rows) {
                     let cells = r.querySelectorAll('td');
                     if (cells.length >= 5) {
@@ -519,10 +518,16 @@ def fetch_huids_from_page(job_id):
             }
             """
             
+            import time
             all_data = []
-            while True:
+            max_pages = 50 # 🔥 CRASH-PROOF: 50 page se zyada nahi jayega (Loop me atakne se bachane ke liye)
+            page_count = 0
+            
+            while page_count < max_pages:
                 if CANCEL_FETCH: break
+                page_count += 1
                 
+                # 1. Current page ka data nikalo
                 current_data = target_frame.evaluate(js_code)
                 if current_data and len(current_data) > 0:
                     for item in current_data:
@@ -531,27 +536,46 @@ def fetch_huids_from_page(job_id):
                             if existing_item['tag'] == item['tag']: exists = True; break
                         if not exists: all_data.append(item)
                             
-                next_btn = target_frame.locator("a#tabWeight_next, a.paginate_button.next").last
-                if next_btn.count() > 0:
-                    btn_class = next_btn.get_attribute("class") or ""
-                    if "disabled" in btn_class or next_btn.get_attribute("aria-disabled") == "true":
+                # 🚀 BUG FIX: DataTables me ID <li> par hoti hai, <a> par nahi!
+                next_li = target_frame.locator("#tabWeight_next, li.paginate_button.next").first
+                
+                if next_li.count() > 0:
+                    btn_class = next_li.get_attribute("class") or ""
+                    
+                    # 2. Check agar next button disabled hai (Aakhri page)
+                    if "disabled" in btn_class or "disabled" in next_li.inner_html():
                         break
                         
+                    # 3. Asli click karne wala link (anchor tag) dhoondo
+                    next_btn = next_li.locator("a").first
+                    if next_btn.count() == 0:
+                        next_btn = next_li # Fallback
+                        
                     old_first_tag = current_data[0]['tag'] if current_data else ""
+                    
                     try: next_btn.click(force=True)
                     except: next_btn.evaluate("node => node.click()")
                     
+                    # 4. Smart Wait: Tab tak wait karo jab tak naya tag na aa jaye
                     wait_start = time.time()
+                    data_changed = False
+                    
                     while time.time() - wait_start < 6:
                         if CANCEL_FETCH: break
                         time.sleep(0.2)
                         try:
                             check_data = target_frame.evaluate(js_code)
                             if check_data and len(check_data) > 0:
-                                if check_data[0]['tag'] != old_first_tag: break
+                                if check_data[0]['tag'] != old_first_tag: 
+                                    data_changed = True
+                                    break
                         except: pass
+                    
+                    # Agar 6 sec wait ke baad bhi page nahi badla (Internet band ho gaya), to loop tod do (CRASH SE BACHAO)
+                    if not data_changed:
+                        break
                 else:
-                    break
+                    break # Next button hi nahi hai
 
             try: browser.disconnect()
             except: pass
@@ -561,7 +585,7 @@ def fetch_huids_from_page(job_id):
 
             if actual_job_card == search_job_id:
                 huids_dict = {item['tag']: item['huid'] for item in all_data if item['huid']}
-                if len(huids_dict) > 0: return {"status": "success", "data": huids_dict, "msg": f"✅ {len(huids_dict)} HUIDs fetched!"}
+                if len(huids_dict) > 0: return {"status": "success", "data": huids_dict, "msg": f"✅ {len(huids_dict)} HUIDs fetched from {page_count} pages!"}
                 else: return {"status": "error", "msg": "⚠️ HUID column khali hai!"}
             else:
                 return {"status": "mismatch", "actual_job": actual_job_card, "tags_data": all_data, "msg": f"Job card mismatch!"}
