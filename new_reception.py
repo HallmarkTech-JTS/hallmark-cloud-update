@@ -20,13 +20,13 @@ def force_stop_process():
         except: pass
 
 # ==============================================================
-# 1. SINGLE RECEPTION INJECTION
+# 1. SINGLE RECEPTION INJECTION (Live Dropdown & Fast Inject)
 # ==============================================================
 def inject_single_reception_tag(job_id, tag_id, weight):
     global CANCEL_FETCH, ACTIVE_BROWSER
     tag_id, weight = str(tag_id).strip(), str(weight).strip()
     search_job_id = str(job_id).split('-L')[0] 
-    print(f"👻 Live Injecting Tag: {tag_id} | Weight: {weight}g | Job: {search_job_id}")
+    print(f"👻 Live Ghost Injecting Tag: {tag_id} | Weight: {weight}g | Job: {search_job_id}")
     
     try:
         with sync_playwright() as p:
@@ -50,24 +50,30 @@ def inject_single_reception_tag(job_id, tag_id, weight):
                 except: pass
                 return {"status": "error", "msg": f"⚠️ Job Card '{search_job_id}' screen par nahi mila."}
             
+            # Row dhoondho
             row = target_frame.locator(f"tr:has-text('{tag_id}')")
             if row.count() > 0:
-                weight_input = row.first.locator("input[type='text'], input.form-control").first
+                weight_input = row.first.locator("input[type='text'], input.form-control, input.scan-input, input.weightCls").first
                 if weight_input.is_visible():
-                    weight_input.evaluate("node => { node.removeAttribute('disabled'); node.removeAttribute('readonly'); }")
-                    weight_input.scroll_into_view_if_needed()
-                    weight_input.click()
                     
-                    main_page = target_frame if hasattr(target_frame, 'once') else target_frame.page
-                    main_page.keyboard.press("Control+A")
-                    main_page.keyboard.press("Backspace")
-                    main_page.keyboard.type(str(weight), delay=50)
-                    weight_input.evaluate("node => { node.dispatchEvent(new Event('input', { bubbles: true })); node.dispatchEvent(new Event('change', { bubbles: true })); node.dispatchEvent(new Event('blur', { bubbles: true })); }")
+                    # 🚀 CRITICAL FIX: PURE GHOST INJECT (Bina Keyboard Typing Ke)
+                    js_inject = f"""node => {{
+                        node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
+                        node.removeAttribute('onpaste'); node.removeAttribute('oncopy'); 
+                        node.removeAttribute('oncut'); node.removeAttribute('oncontextmenu'); 
+                        node.value = '{weight}'; 
+                        node.dispatchEvent(new Event('input', {{ bubbles: true }})); 
+                        node.dispatchEvent(new Event('change', {{ bubbles: true }})); 
+                        node.dispatchEvent(new Event('blur', {{ bubbles: true }})); 
+                    }}"""
+                    weight_input.evaluate(js_inject)
                     
+                    # Save Button ko Ghost Click karna
                     save_btn = row.first.locator("text='Save'").first
                     if save_btn.is_visible():
+                        main_page = target_frame if hasattr(target_frame, 'once') else target_frame.page
                         main_page.once("dialog", lambda dialog: dialog.accept())
-                        save_btn.click(force=True)
+                        save_btn.evaluate("node => node.click()") # 🚀 JS Force Click
                         time.sleep(1)
                         
                     try: browser.disconnect()
@@ -78,23 +84,24 @@ def inject_single_reception_tag(job_id, tag_id, weight):
     except Exception as e: return {"status": "error", "msg": f"⚠️ Error: {str(e)}"}
 
 # ==============================================================
-# 2. BULK INJECTION (GHOST)
+# 3. FULL AUTO INJECTION (Poori list ek sath)
 # ==============================================================
 def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
     global CANCEL_FETCH, ACTIVE_BROWSER
     CANCEL_FETCH = False
     search_job_id = str(job_id).split('-L')[0] 
     
-    if not job_data: return "⚠️ Database khali hai."
-    print(f"👻 Auto Injection Started... Job: {search_job_id}")
+    print(f"👻 Ghost Injecting Reception for: {search_job_id} (Original: {job_id})")
+    if not job_data: return "⚠️ डेटाबेस खाली है।"
+    print(f"👻 Auto Injection Started (Speed: {delay_ms}ms)... Job: {job_id}")
 
     try:
         with sync_playwright() as p:
             try: 
-                browser = p.chromium.connect_over_cdp(CDP_URL, timeout=3000)
+                browser = p.chromium.connect_over_cdp(CDP_URL)
                 ACTIVE_BROWSER = browser
-            except: return "⚠️ Browser open nahi hai!"
-            
+            except: return "⚠️ ब्राउज़र ओपन नहीं है!"
+
             job_matched = False
             for page in browser.contexts[0].pages:
                 try:
@@ -112,50 +119,117 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=1500):
                 return f"❌ Wrong Page! Site par ID '{search_job_id}' open nahi hai."
 
             filled_count = 0
-            for tag_info in job_data:
-                if CANCEL_FETCH: break
-                tag_id = str(tag_info[0]).strip()
-                target_weight = str(tag_info[1]).strip()
-                if not target_weight or target_weight == "0" or target_weight == "0.0": continue
+            for item in job_data:
+                if CANCEL_FETCH:
+                    print("🛑 User Cancelled Auto Injection!")
+                    break
 
+                tag_id, weight = str(item[0]).strip(), str(item[1]).strip()
+                
+                # 🚀 CRITICAL FIX 1: 0.0 weight wale tags ko skip karna zaroori hai!
+                if not weight or weight == "0" or weight == "0.0": 
+                    continue
+                
+                target_frame = None
                 tag_found = False
-                for page in browser.contexts[0].pages:
-                    if tag_found: break
-                    frames_to_check = [page] + page.frames
-                    for frame in frames_to_check:
-                        try:
-                            row = frame.locator(f"tr:has-text('{tag_id}')")
-                            if row.count() > 0:
-                                input_box = row.first.locator("input[type='text'], input.form-control").first
-                                if input_box.is_visible():
-                                    input_box.evaluate("node => { node.removeAttribute('disabled'); node.removeAttribute('readonly'); }")
-                                    input_box.scroll_into_view_if_needed()
-                                    input_box.click()
-                                    
-                                    main_page = frame if hasattr(frame, 'once') else frame.page
-                                    main_page.keyboard.press("Control+A")
-                                    main_page.keyboard.press("Backspace")
-                                    main_page.keyboard.type(target_weight, delay=50)
-                                    input_box.evaluate("node => { node.dispatchEvent(new Event('input', { bubbles: true })); node.dispatchEvent(new Event('change', { bubbles: true })); node.dispatchEvent(new Event('blur', { bubbles: true })); }")
-                                    
-                                    save_btn = row.first.locator("text='Save'").first
-                                    if save_btn.is_visible():
-                                        main_page.once("dialog", lambda dialog: dialog.accept())
-                                        save_btn.click(force=True)
-                                        time.sleep(int(delay_ms) / 1000.0)
-                                    
-                                    filled_count += 1
-                                    tag_found = True
-                                    break
-                        except Exception as e: pass
 
-            try: browser.disconnect()
+                while True:
+                    for page in browser.contexts[0].pages:
+                        try:
+                            if page.locator("tr").filter(has=page.locator("td").get_by_text(tag_id, exact=True)).count() > 0:
+                                target_frame = page
+                                tag_found = True
+                                break
+                        except: pass
+                        
+                        if not tag_found:
+                            for frame in page.frames:
+                                try:
+                                    if frame.locator("tr").filter(has=frame.locator("td").get_by_text(tag_id, exact=True)).count() > 0:
+                                        target_frame = frame
+                                        tag_found = True
+                                        break
+                                except: pass
+                        if tag_found: break
+
+                    if tag_found: break
+
+                    next_btn_clicked = False
+                    for page in browser.contexts[0].pages:
+                        frames_to_check = [page] + page.frames
+                        for f in frames_to_check:
+                            try:
+                                next_btn = f.locator("a.paginate_button.next, a#tabWeight_next, li.next a, a:has-text('Next'), a:has-text('›')").last
+                                if next_btn.count() > 0:
+                                    btn_class = next_btn.get_attribute("class") or ""
+                                    is_disabled = "disabled" in btn_class or next_btn.get_attribute("aria-disabled") == "true" or next_btn.get_attribute("disabled") is not None
+                                    
+                                    if not is_disabled:
+                                        next_btn.evaluate("node => node.click()") 
+                                        time.sleep(1.2) 
+                                        next_btn_clicked = True
+                                        break
+                            except: pass
+                        if next_btn_clicked: break
+
+                    if not next_btn_clicked: break
+
+                if not target_frame or not tag_found: 
+                    print(f"⚠️ Alert: Tag {tag_id} kisi bhi page par nahi mila, skip kar rahe hain.")
+                    continue
+
+                try:
+                    row = target_frame.locator("tr").filter(has=target_frame.locator("td:nth-child(2), td:nth-child(3)").get_by_text(tag_id, exact=True))
+                    
+                    if row.count() > 0:
+                        target_row = row.first
+                        weight_input = target_row.locator("input.weightCls, input.scan-input, input[name='articlWeight'], input:not([type='hidden']):not([type='checkbox'])").first
+                        
+                        if weight_input.count() > 0:
+                            current_val = str(weight_input.evaluate("node => node.value")).strip()
+                            if current_val != weight:
+                                
+                                # 🚀 CRITICAL FIX 2: 100% Pure Ghost Inject (With 'blur' event)
+                                js_inject = f"""node => {{
+                                    node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
+                                    node.removeAttribute('onpaste'); node.removeAttribute('oncopy'); 
+                                    node.removeAttribute('oncut'); node.removeAttribute('oncontextmenu'); 
+                                    node.value = '{weight}'; 
+                                    node.dispatchEvent(new Event('input', {{ bubbles: true }})); 
+                                    node.dispatchEvent(new Event('change', {{ bubbles: true }})); 
+                                    node.dispatchEvent(new Event('blur', {{ bubbles: true }})); 
+                                }}"""
+                                weight_input.evaluate(js_inject)
+                                
+                                save_btn = target_row.locator("text='Save'").first
+                                if save_btn.is_visible():
+                                    main_page = target_frame if hasattr(target_frame, 'once') else target_frame.page
+                                    main_page.once("dialog", lambda dialog: dialog.accept())
+                                    
+                                    # Ghost Click
+                                    save_btn.evaluate("node => node.click()") 
+                                    
+                                    print(f"⏳ Tag {tag_id} saved. Waiting for BIS portal to stabilize...")
+                                    time.sleep(1.5) 
+                                    try:
+                                        main_page.wait_for_load_state("networkidle", timeout=5000)
+                                        target_frame.wait_for_selector("table tbody tr", state="visible", timeout=5000)
+                                    except: pass
+                                    
+                                    time.sleep(delay_ms / 1000.0) 
+                                
+                                filled_count += 1
+                except Exception as e: print(f"⚠️ Error: {e}")
+
+            try: browser.disconnect() 
             except: pass
             
-            if CANCEL_FETCH: return f"🛑 Process Stopped! {filled_count} tags injected."
-            return f"✅ SUCCESS: {filled_count} Tags injected for {search_job_id}!"
-    except Exception as e: return f"⚠️ System Error: {str(e)}"
-
+            if CANCEL_FETCH:
+                return f"🛑 STOPPED! {filled_count} Tags Save hone ke baad process rok di gayi."
+            return f"✅ Success! {filled_count} Tags Save kar diye gaye."
+    except Exception as e:
+        logging.error(f"Auto Inject Error: {e}", exc_info=True)
+        return f"⚠️ Error: {e}"
 # ==============================================================
 # 3. SCRAPE ALL REQUESTS FROM MAIN PAGE
 # ==============================================================
