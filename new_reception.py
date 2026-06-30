@@ -387,7 +387,7 @@ def scrape_all_requests_from_main():
     except Exception as e: return {"status": "error", "msg": str(e)}
 
 # ==============================================================
-# 5. PROCESS SELECTED REQUESTS (QM VIEW & LOT SPLITTER)
+# 5. PROCESS SELECTED REQUESTS (QM VIEW & LOT SPLITTER FIXED)
 # ==============================================================
 def process_selected_requests(selected_reqs, master_info):
     global CANCEL_FETCH, ACTIVE_BROWSER
@@ -396,9 +396,12 @@ def process_selected_requests(selected_reqs, master_info):
     
     try:
         with sync_playwright() as p:
-            browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
-            ACTIVE_BROWSER = browser
-            context = browser.contexts[0]
+            try:
+                browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
+                ACTIVE_BROWSER = browser
+                context = browser.contexts[0]
+            except: return {"status": "error", "msg": "⚠️ Secure Browser open nahi hai!"}
+            
             total_jobs_saved = 0
 
             for req in selected_reqs:
@@ -473,30 +476,34 @@ def process_selected_requests(selected_reqs, master_info):
                             
                     if not job_found: continue 
 
-                    view_btn = row.locator("a").last 
+                    # 🚀 BUG FIX: Natural Click (Bina naye tab me khole)
+                    view_btn = row.locator("a.fa-eye, a.fa-list, a:has-text('View'), button:has-text('View'), a").last 
                     try:
-                        with context.expect_page(timeout=10000) as new_page_info:
-                            view_btn.evaluate("node => { node.setAttribute('target', '_blank'); node.click(); }")
-                        new_page = new_page_info.value
+                        try: view_btn.click(force=True)
+                        except: view_btn.evaluate("node => node.click()")
                     except: continue
 
                     target_new_frame = None
                     tab_wait_start = time.time()
                     
-                    while time.time() - tab_wait_start < 60:
+                    print("⏳ View par click kiya. Tags load hone ka wait kar rahe hain...")
+                    # Popup/Modal aane ka safe wait karega
+                    while time.time() - tab_wait_start < 45:
                         if CANCEL_FETCH: break
                         for page_tab in context.pages:
                             for frame in [page_tab] + page_tab.frames:
                                 try:
-                                    if "TAG ID" in frame.locator("body").inner_text().upper(): target_new_frame = frame; break
+                                    if "TAG ID" in frame.locator("body").inner_text().upper(): 
+                                        target_new_frame = frame; break
                                 except: pass
                             if target_new_frame: break
                         if target_new_frame: break 
                         time.sleep(1) 
                         
-                    if not target_new_frame: target_new_frame = new_page 
+                    if not target_new_frame: 
+                        print(f"⚠️ Job {job} ka tags page nahi khula.")
+                        continue 
 
-                    # 🚀 USER'S ORIGINAL JS EXTRACTOR
                     js_code_tags = """
                     () => {
                         let results = [];
@@ -517,7 +524,7 @@ def process_selected_requests(selected_reqs, master_info):
                                     let cells = r.querySelectorAll('td');
                                     if (cells.length > tagIdx) {
                                         let tag = cells[tagIdx].innerText.trim();
-                                        if (!tag || tag.toUpperCase().includes('TAG')) continue;
+                                        if (!tag || tag.toUpperCase().includes('TAG') || tag.includes('No data')) continue;
                                         
                                         let cat = (catIdx !== -1 && cells.length > catIdx && cells[catIdx]) ? cells[catIdx].innerText.trim() : "-";
                                         let pur = (purIdx !== -1 && cells.length > purIdx && cells[purIdx]) ? cells[purIdx].innerText.trim() : "-";
@@ -554,7 +561,6 @@ def process_selected_requests(selected_reqs, master_info):
                             if "disabled" not in btn_class and next_btn.get_attribute("aria-disabled") != "true":
                                 next_btn.evaluate("node => node.click()")
                                 
-                                # 🚀 FAST POLLING
                                 t_wait = time.time()
                                 while time.time() - t_wait < 10:
                                     if CANCEL_FETCH: break
@@ -565,11 +571,23 @@ def process_selected_requests(selected_reqs, master_info):
                             else: break
                         else: break 
 
-                    try: new_page.close()
-                    except: pass
+                    # 🚀 SMART FIX: Naya tab, Same page, ya Popup Modal sabko safely band karega
+                    close_btn = target_new_frame.locator("button.close, button:has-text('Close'), a.close, button[data-dismiss='modal']").first
+                    if close_btn.count() > 0 and close_btn.is_visible():
+                        try: close_btn.click(force=True)
+                        except: close_btn.evaluate("node => node.click()")
+                        time.sleep(1)
+                    else:
+                        if len(context.pages) > 1 and target_new_frame.page != context.pages[0]:
+                            try: target_new_frame.page.close()
+                            except: pass
+                        else:
+                            try: target_new_frame.page.go_back()
+                            except: pass
+                            time.sleep(2)
 
                     if all_scraped_items and not CANCEL_FETCH:
-                        # 🚀 NAYA: LOT SPLITTING LOGIC (Fetch Hote Hi L1, L2 me toot jayega)
+                        # 🚀 LOT SPLITTING LOGIC INCLUDED
                         lot_dict = split_tags_into_lots(job, all_scraped_items)
                         for lot_job_id, tags_chunk in lot_dict.items():
                             db.save_scraped_job_card(lot_job_id, tags_chunk, request_no=req)
