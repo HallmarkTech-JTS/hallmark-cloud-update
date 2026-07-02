@@ -466,9 +466,8 @@ def scrape_all_requests_from_main():
             
     except Exception as e: return {"status": "error", "msg": str(e)}
 # ==============================================================
-# 5. PROCESS SELECTED REQUESTS (100% BULLETPROOF & LOW-RAM OPTIMIZED)
+# 5. PROCESS SELECTED REQUESTS (SINGLE TAB MANAGEMENT + BULLETPROOF)
 # ==============================================================
-
 def process_selected_requests(selected_reqs, master_info):
     global CANCEL_FETCH, ACTIVE_BROWSER
     CANCEL_FETCH = False
@@ -490,6 +489,13 @@ def process_selected_requests(selected_reqs, master_info):
                 jobs = master_info.get(req, [])
                 for job in jobs:
                     if CANCEL_FETCH: break
+
+                    # 🚀 MAGIC FIX 1: Pichle saare extra tabs band karo (Confusion Khatam)
+                    # Main dashboard (index 0) ko chhodkar sab close kar do.
+                    while len(context.pages) > 1:
+                        try: context.pages[-1].close()
+                        except: break
+                    time.sleep(0.5) 
                     
                     target_frame = None
                     wait_start_time = time.time()
@@ -556,6 +562,9 @@ def process_selected_requests(selected_reqs, master_info):
                             
                     if not job_found: continue 
 
+                    # Pata lagao ki click se pehle kitne tabs khule hain
+                    pages_before_click = len(context.pages)
+
                     # 🚀 BULLETPROOF CLICK LOGIC
                     try:
                         view_btn = row.locator("a.fa-eye, a[title*='View' i], button[title*='View' i], a:has-text('View')").first
@@ -566,21 +575,43 @@ def process_selected_requests(selected_reqs, master_info):
                     except: continue
 
                     target_new_frame = None
+                    new_opened_page = None
                     tab_wait_start = time.time()
                     
+                    # Naya tab ya popup aane ka wait karo
                     while time.time() - tab_wait_start < 45:
                         if CANCEL_FETCH: break
-                        for page_tab in context.pages:
-                            for frame in [page_tab] + page_tab.frames:
+                        
+                        # Agar naya tab khula hai
+                        if len(context.pages) > pages_before_click:
+                            new_opened_page = context.pages[-1]
+                            target_new_frame = new_opened_page
+                        
+                        if target_new_frame:
+                            try:
+                                if target_new_frame.locator("th:has-text('TAG ID'), td:has-text('TAG ID'), th:has-text('AHC TAG')").count() > 0:
+                                    break
+                            except: pass
+                        else:
+                            # Agar naya tab nahi khula aur same page par popup aaya hai
+                            for frame in [context.pages[0]] + context.pages[0].frames:
                                 try:
                                     if frame.locator("th:has-text('TAG ID'), td:has-text('TAG ID'), th:has-text('AHC TAG')").count() > 0:
                                         target_new_frame = frame; break
                                 except: pass
                             if target_new_frame: break
-                        if target_new_frame: break 
+                            
                         time.sleep(1) 
                         
                     if not target_new_frame: continue 
+
+                    # Network load hone ka wait (Khali table ki problem solve karega)
+                    try:
+                        actual_page = target_new_frame if not hasattr(target_new_frame, 'page') else target_new_frame.page
+                        actual_page.wait_for_load_state("networkidle", timeout=4000)
+                    except: pass
+                    
+                    time.sleep(2) 
 
                     js_code_tags = """
                     () => {
@@ -626,6 +657,11 @@ def process_selected_requests(selected_reqs, master_info):
                         try: res = target_new_frame.evaluate(js_code_tags)
                         except: res = None
                         
+                        if res is None and not all_scraped_items:
+                            time.sleep(2)
+                            try: res = target_new_frame.evaluate(js_code_tags)
+                            except: res = None
+
                         if res == previous_page_data: break
                             
                         if res:
@@ -640,7 +676,6 @@ def process_selected_requests(selected_reqs, master_info):
                             if "disabled" not in btn_class and next_btn.get_attribute("aria-disabled") != "true":
                                 next_btn.evaluate("node => node.click()")
                                 
-                                # 🚀 FAST POLLING
                                 t_wait = time.time()
                                 while time.time() - t_wait < 10:
                                     if CANCEL_FETCH: break
@@ -651,21 +686,22 @@ def process_selected_requests(selected_reqs, master_info):
                             else: break
                         else: break 
 
-                    # 🚀 SMART MODAL CLOSE LOGIC
-                    try:
-                        close_js = """() => {
-                            let closeBtn = document.querySelector("button.close, button[data-dismiss='modal'], a.close");
-                            if (closeBtn) { closeBtn.click(); return true; }
-                            return false;
-                        }"""
-                        closed_via_js = target_new_frame.evaluate(close_js)
+                    # 🚀 MAGIC FIX 2: Sirf jo naya tab khula tha usko safely band karo
+                    if new_opened_page:
+                        try: new_opened_page.close()
+                        except: pass
+                    else:
+                        # Agar Popup tha toh use JS se close karo
+                        try:
+                            close_js = """() => {
+                                let closeBtn = document.querySelector("button.close, button[data-dismiss='modal'], a.close");
+                                if (closeBtn) { closeBtn.click(); return true; }
+                                return false;
+                            }"""
+                            target_new_frame.evaluate(close_js)
+                        except: pass
                         
-                        if not closed_via_js:
-                            actual_page = target_new_frame if not hasattr(target_new_frame, 'page') else target_new_frame.page
-                            if len(context.pages) > 1 and actual_page != context.pages[0]: actual_page.close()
-                            else: actual_page.go_back()
-                    except: pass
-                    time.sleep(1)
+                    time.sleep(1) # Agle Job Card par jaane se pehle 1 second ki saans
 
                     # 🚀 DATABASE SAVE & RAM OPTIMIZATION
                     if all_scraped_items and not CANCEL_FETCH:
@@ -674,7 +710,7 @@ def process_selected_requests(selected_reqs, master_info):
                             db.save_scraped_job_card(lot_job_id, tags_chunk, request_no=req)
                         total_jobs_saved += 1
                         
-                    # 🔥 RAM CLEARING FOR LOW END PC 🔥
+                    # RAM saaf karein
                     all_scraped_items.clear() 
                     gc.collect() 
 
@@ -689,7 +725,6 @@ def process_selected_requests(selected_reqs, master_info):
             return {"status": "success", "msg": f"✅ {total_jobs_saved} Jobs Database mein Lot-Wise save ho gaye!"}
             
     except Exception as e: return {"status": "error", "msg": str(e)}
-
 # ==============================================================
 # 6. SCRAPE REQUESTS FROM XRF PAGE (PERMANENT HEADER LOGIC)
 # ==============================================================
