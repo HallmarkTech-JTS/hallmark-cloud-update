@@ -478,11 +478,9 @@ def process_selected_requests(selected_reqs, master_info):
 
                     # 🚀 BULLETPROOF CLICK LOGIC (Last Column Action Button)
                     try:
-                        # Hamesha table ki row ka aakhri column (td) pakdo, jisme Action button hota hai
                         action_cell = row.locator("td").last
                         view_btn = action_cell.locator("a, button").first
                         
-                        # Button ko screen par highlight karke click karega (Taaki aapko dikhe)
                         view_btn.evaluate("node => { node.scrollIntoView(); node.style.border = '2px solid red'; node.click(); }")
                         print(f"✅ Job {job} ke View button par click kiya!")
                     except Exception as e:
@@ -494,13 +492,11 @@ def process_selected_requests(selected_reqs, master_info):
                     
                     print("⏳ View par click kiya. Tags load hone ka wait kar rahe hain...")
                     
-                    # Popup, Naya Tab, ya Same page - teeno ka pakka wait
                     while time.time() - tab_wait_start < 45:
                         if CANCEL_FETCH: break
                         for page_tab in context.pages:
                             for frame in [page_tab] + page_tab.frames:
                                 try:
-                                    # 'TAG ID' ya 'AHC TAG' wali table dhundho
                                     if frame.locator("th:has-text('TAG ID'), td:has-text('TAG ID'), th:has-text('AHC TAG'), th:has-text('Tag ID')").count() > 0:
                                         target_new_frame = frame
                                         break
@@ -580,25 +576,26 @@ def process_selected_requests(selected_reqs, master_info):
                             else: break
                         else: break 
 
-                    # 🚀 CLOSE MODAL / TAB SAFELY
+                    # 🚀 CLOSE MODAL / TAB SAFELY (🔥 BUG FIXED HERE 🔥)
                     close_btn = target_new_frame.locator("button.close, button:has-text('Close'), a.close, button[data-dismiss='modal']").first
                     if close_btn.count() > 0 and close_btn.is_visible():
                         try: close_btn.click(force=True)
                         except: close_btn.evaluate("node => node.click()")
                         time.sleep(1)
                     else:
-                        if len(context.pages) > 1 and target_new_frame.page != context.pages[0]:
-                            try: target_new_frame.page.close()
+                        # Smart Check: Frame hai ya Page, uske hisaab se parent page ko extract karega
+                        actual_page = target_new_frame if not hasattr(target_new_frame, 'page') else target_new_frame.page
+                        
+                        if len(context.pages) > 1 and actual_page != context.pages[0]:
+                            try: actual_page.close()
                             except: pass
                         else:
                             try:
-                                # Agar Back button hai to waha click karo, warna page reload
-                                target_new_frame.page.go_back()
+                                actual_page.go_back()
                             except: pass
                             time.sleep(2)
 
                     if all_scraped_items and not CANCEL_FETCH:
-                        # 🚀 LOT SPLITTING LOGIC
                         lot_dict = split_tags_into_lots(job, all_scraped_items)
                         for lot_job_id, tags_chunk in lot_dict.items():
                             db.save_scraped_job_card(lot_job_id, tags_chunk, request_no=req)
@@ -618,7 +615,6 @@ def process_selected_requests(selected_reqs, master_info):
             return {"status": "success", "msg": f"✅ {total_jobs_saved} Jobs Database mein Lot-Wise (L1, L2) save ho gaye!"}
             
     except Exception as e: return {"status": "error", "msg": str(e)}
-
 
 # ==============================================================
 # 6. SCRAPE REQUESTS FROM XRF PAGE (Permanent Header Logic)
