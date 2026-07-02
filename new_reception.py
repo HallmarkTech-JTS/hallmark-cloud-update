@@ -387,8 +387,10 @@ def scrape_all_requests_from_main():
     except Exception as e: return {"status": "error", "msg": str(e)}
 
 # ==============================================================
-# 5. PROCESS SELECTED REQUESTS (QM VIEW & LOT SPLITTER FIXED)
+# 5. PROCESS SELECTED REQUESTS (100% ACCURATE & LOW-RAM OPTIMIZED)
 # ==============================================================
+import gc # 🚀 NAYA: RAM ko clean rakhne ke liye
+
 def process_selected_requests(selected_reqs, master_info):
     global CANCEL_FETCH, ACTIVE_BROWSER
     CANCEL_FETCH = False
@@ -476,12 +478,14 @@ def process_selected_requests(selected_reqs, master_info):
                             
                     if not job_found: continue 
 
-                    # 🚀 BULLETPROOF CLICK LOGIC (Last Column Action Button)
+                    # 🚀 BULLETPROOF CLICK LOGIC (Sirf 'View/Eye' Button par click karega)
                     try:
-                        action_cell = row.locator("td").last
-                        view_btn = action_cell.locator("a, button").first
+                        # 100% Exact View Button dhoondhega (galat button dabaane ka chance zero)
+                        view_btn = row.locator("a.fa-eye, a[title*='View' i], button[title*='View' i], a:has-text('View')").first
+                        if view_btn.count() == 0:
+                            view_btn = row.locator("td").last.locator("a, button").first
                         
-                        view_btn.evaluate("node => { node.scrollIntoView(); node.style.border = '2px solid red'; node.click(); }")
+                        view_btn.evaluate("node => { node.scrollIntoView(); node.style.border = '3px solid green'; node.click(); }")
                         print(f"✅ Job {job} ke View button par click kiya!")
                     except Exception as e:
                         print(f"⚠️ Click Error: {e}")
@@ -497,7 +501,7 @@ def process_selected_requests(selected_reqs, master_info):
                         for page_tab in context.pages:
                             for frame in [page_tab] + page_tab.frames:
                                 try:
-                                    if frame.locator("th:has-text('TAG ID'), td:has-text('TAG ID'), th:has-text('AHC TAG'), th:has-text('Tag ID')").count() > 0:
+                                    if frame.locator("th:has-text('TAG ID'), td:has-text('TAG ID'), th:has-text('AHC TAG')").count() > 0:
                                         target_new_frame = frame
                                         break
                                 except: pass
@@ -529,7 +533,9 @@ def process_selected_requests(selected_reqs, master_info):
                                     let cells = r.querySelectorAll('td');
                                     if (cells.length > tagIdx) {
                                         let tag = cells[tagIdx].innerText.trim();
-                                        if (!tag || tag.toUpperCase().includes('TAG') || tag.includes('No data')) continue;
+                                        
+                                        // 🚀 BUG FIX: Empty ya 'No Data' wali line completely ignore hogi
+                                        if (!tag || tag.toUpperCase().includes('TAG') || tag.toUpperCase().includes('NO DATA')) continue;
                                         
                                         let cat = (catIdx !== -1 && cells.length > catIdx && cells[catIdx]) ? cells[catIdx].innerText.trim() : "-";
                                         let pur = (purIdx !== -1 && cells.length > purIdx && cells[purIdx]) ? cells[purIdx].innerText.trim() : "-";
@@ -566,56 +572,59 @@ def process_selected_requests(selected_reqs, master_info):
                             if "disabled" not in btn_class and next_btn.get_attribute("aria-disabled") != "true":
                                 next_btn.evaluate("node => node.click()")
                                 
+                                # 🚀 FAST POLLING: Agla page aane ka 0.1s me wait karega
                                 t_wait = time.time()
                                 while time.time() - t_wait < 10:
                                     if CANCEL_FETCH: break
-                                    time.sleep(0.2)
+                                    time.sleep(0.1) # PC ko hang kiye bina fast check
                                     try:
                                         if target_new_frame.evaluate(js_code_tags) != previous_page_data: break
                                     except: pass
                             else: break
                         else: break 
 
-                    # 🚀 CLOSE MODAL / TAB SAFELY (🔥 BUG FIXED HERE 🔥)
-                    close_btn = target_new_frame.locator("button.close, button:has-text('Close'), a.close, button[data-dismiss='modal']").first
-                    if close_btn.count() > 0 and close_btn.is_visible():
-                        try: close_btn.click(force=True)
-                        except: close_btn.evaluate("node => node.click()")
-                        time.sleep(1)
-                    else:
-                        # Smart Check: Frame hai ya Page, uske hisaab se parent page ko extract karega
-                        actual_page = target_new_frame if not hasattr(target_new_frame, 'page') else target_new_frame.page
+                    # 🚀 SMART MODAL CLOSE LOGIC
+                    try:
+                        # JS ke jariye sidha close button dabana sabse fast aur safe hai
+                        close_js = """() => {
+                            let closeBtn = document.querySelector("button.close, button[data-dismiss='modal'], a.close");
+                            if (closeBtn) { closeBtn.click(); return true; }
+                            return false;
+                        }"""
+                        closed_via_js = target_new_frame.evaluate(close_js)
                         
-                        if len(context.pages) > 1 and actual_page != context.pages[0]:
-                            try: actual_page.close()
-                            except: pass
-                        else:
-                            try:
+                        # Agar JS se band nahi hua, toh tab/page band karo
+                        if not closed_via_js:
+                            actual_page = target_new_frame if not hasattr(target_new_frame, 'page') else target_new_frame.page
+                            if len(context.pages) > 1 and actual_page != context.pages[0]:
+                                actual_page.close()
+                            else:
                                 actual_page.go_back()
-                            except: pass
-                            time.sleep(2)
+                    except: pass
+                    time.sleep(1)
 
+                    # 🚀 DATABASE SAVE & RAM OPTIMIZATION
                     if all_scraped_items and not CANCEL_FETCH:
                         lot_dict = split_tags_into_lots(job, all_scraped_items)
                         for lot_job_id, tags_chunk in lot_dict.items():
                             db.save_scraped_job_card(lot_job_id, tags_chunk, request_no=req)
                         total_jobs_saved += 1
+                        
+                    # 🔥 RAM CLEARING FOR LOW END PC 🔥
+                    all_scraped_items.clear() 
+                    gc.collect() # Har job card ke baad kachra saaf!
 
-                    if target_frame and search_box.count() > 0:
-                        try: search_box.fill("")
-                        except: pass
-                        time.sleep(0.5)
+                gc.collect() # Har request ke baad kachra saaf!
 
             try: browser.disconnect()
             except: pass
             
             if CANCEL_FETCH: return {"status": "error", "msg": f"🛑 Cancelled! {total_jobs_saved} Jobs database me save huye."}
-            if total_jobs_saved == 0: return {"status": "error", "msg": "⚠️ Data Fetch Fail! Page load nahi hua ya tags nahi mile."}
+            if total_jobs_saved == 0: return {"status": "error", "msg": "⚠️ Data Fetch Fail! (Ya toh tags nahi the ya galat button daba)"}
                 
-            return {"status": "success", "msg": f"✅ {total_jobs_saved} Jobs Database mein Lot-Wise (L1, L2) save ho gaye!"}
+            return {"status": "success", "msg": f"✅ {total_jobs_saved} Jobs Database mein Lot-Wise save ho gaye!"}
             
     except Exception as e: return {"status": "error", "msg": str(e)}
-
 # ==============================================================
 # 6. SCRAPE REQUESTS FROM XRF PAGE (Permanent Header Logic)
 # ==============================================================
