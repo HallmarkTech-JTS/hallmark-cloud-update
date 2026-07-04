@@ -691,14 +691,20 @@ def process_selected_requests(selected_reqs, master_info):
                         try: new_opened_page.close()
                         except: pass
                     else:
-                        # Agar Popup tha toh use JS se close karo
+                        # 🚀 XRF PAGE FIX: Agar same tab me details open hui hain, to "Go Back" dabao
                         try:
-                            close_js = """() => {
-                                let closeBtn = document.querySelector("button.close, button[data-dismiss='modal'], a.close");
-                                if (closeBtn) { closeBtn.click(); return true; }
-                                return false;
-                            }"""
-                            target_new_frame.evaluate(close_js)
+                            go_back_btn = target_new_frame.locator("a:has-text('Go Back'), button:has-text('Go Back'), a:has-text('Back')").first
+                            if go_back_btn.count() > 0:
+                                go_back_btn.evaluate("node => node.click()")
+                                time.sleep(2.0) # Wapas main dashboard load hone ka wait karega
+                            else:
+                                # Agar Popup tha toh use JS se close karo
+                                close_js = """() => {
+                                    let closeBtn = document.querySelector("button.close, button[data-dismiss='modal'], a.close");
+                                    if (closeBtn) { closeBtn.click(); return true; }
+                                    return false;
+                                }"""
+                                target_new_frame.evaluate(close_js)
                         except: pass
                         
                     time.sleep(1) # Agle Job Card par jaane se pehle 1 second ki saans
