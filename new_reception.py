@@ -737,7 +737,7 @@ def process_selected_requests(selected_reqs, master_info):
 # ==============================================================
 def scrape_all_requests_from_xrf():
     """XRF page ('Submitted Articles List') se Request aur Job data extract karna"""
-    global CANCEL_FETCH, ACTIVE_BROWSER   # ✅ Ise thoda aage khiska dein (Align karein)
+    global CANCEL_FETCH, ACTIVE_BROWSER
     CANCEL_FETCH = False
     print("🌐 XRF Backup Page se data fetch kar rahe hain...")
     
@@ -745,7 +745,7 @@ def scrape_all_requests_from_xrf():
         with sync_playwright() as p:
             try: 
                 browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
-                ACTIVE_BROWSER = browser       # 🔥 NAYI LINE
+                ACTIVE_BROWSER = browser
             except: return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
 
             # 🚀 Exact JS Logic for the XRF "Submitted Articles List" Table
