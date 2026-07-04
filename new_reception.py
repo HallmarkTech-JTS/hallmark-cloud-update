@@ -294,7 +294,8 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
 
                 if not tag_map or CANCEL_FETCH: break 
                 
-                next_btn = target_frame.locator("a.paginate_button.next, a#tabWeight_next, li.next a").last
+                # 🚀 BUG FIX: '.last' ko '.first' me badla taaki upar wale (sahi) table ka Next button dabe
+                next_btn = target_frame.locator("a.paginate_button.next, a#tabWeight_next, li.next a").first
                 if next_btn.count() > 0:
                     btn_class = next_btn.get_attribute("class") or ""
                     if "disabled" in btn_class or next_btn.get_attribute("aria-disabled") == "true":
@@ -896,16 +897,19 @@ def fetch_huids_from_page(job_id):
                 let rows = document.querySelectorAll('table tbody tr');
                 for (let r of rows) {
                     let cells = r.querySelectorAll('td');
-                    if (cells.length >= 5) {
+                    // 🚀 FIX: 6 Columns check karega taaki Weight bhi nikal sake
+                    if (cells.length >= 6) { 
                         let tag = cells[1].innerText.trim();
                         let matCat = cells[2].innerText.trim();
                         let itemCat = cells[3].innerText.trim();
                         let huid = cells[4].innerText.trim();
+                        let weight = cells[5].innerText.trim(); // 🚀 NAYA: Weight nikal liya
                         
                         if (tag && tag !== "" && tag.toUpperCase() !== "AHC TAG") {
                             data.push({
                                 "tag": tag, "category": itemCat,
-                                "purity": matCat, "huid": (huid !== "-") ? huid : ""
+                                "purity": matCat, "huid": (huid !== "-") ? huid : "",
+                                "weight": weight // 🚀 NAYA: Data me weight bhej diya
                             });
                         }
                     }
@@ -955,8 +959,9 @@ def fetch_huids_from_page(job_id):
             if not actual_job_card: actual_job_card = "UNKNOWN_JOB"
 
             if actual_job_card == search_job_id:
-                huids_dict = {item['tag']: item['huid'] for item in all_data if item['huid']}
-                if len(huids_dict) > 0: return {"status": "success", "data": huids_dict}
+                # 🚀 FIX: Ab HUID ke sath Weight bhi bhejna hai
+                tags_info = {item['tag']: {"huid": item['huid'], "weight": item.get('weight', '')} for item in all_data}
+                if len(tags_info) > 0: return {"status": "success", "data": tags_info}
                 else: return {"status": "error", "msg": "⚠️ HUID khali hai!"}
             else:
                 return {"status": "mismatch", "actual_job": actual_job_card, "tags_data": all_data, "msg": f"Job card mismatch!"}
