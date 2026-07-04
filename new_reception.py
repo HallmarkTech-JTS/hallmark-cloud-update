@@ -736,142 +736,140 @@ def process_selected_requests(selected_reqs, master_info):
 # 🌟 5. NEW: SCRAPE REQUESTS FROM XRF PAGE (BACKUP FETCH)
 # ==============================================================
 def scrape_all_requests_from_xrf():
-    """XRF page ('Submitted Articles List') se Request aur Job data extract karna"""
-    global CANCEL_FETCH, ACTIVE_BROWSER   # ✅ Ise thoda aage khiska dein (Align karein)
-    CANCEL_FETCH = False
-    print("🌐 XRF Backup Page se data fetch kar rahe hain...")
-    
-    try:
-        with sync_playwright() as p:
-            try: 
-                browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
-               
-                ACTIVE_BROWSER = browser       # 🔥 NAYI LINE
-            except: return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
+    """XRF page ('Submitted Articles List') se Request aur Job data extract karna"""
+    global CANCEL_FETCH, ACTIVE_BROWSER   # ✅ Ise thoda aage khiska dein (Align karein)
+    CANCEL_FETCH = False
+    print("🌐 XRF Backup Page se data fetch kar rahe hain...")
+    
+    try:
+        with sync_playwright() as p:
+            try: 
+                browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
+                ACTIVE_BROWSER = browser       # 🔥 NAYI LINE
+            except: return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
 
-            # 🚀 Exact JS Logic for the XRF "Submitted Articles List" Table
-            js_code = """
-            () => {
-                let results = {};
-                let rows = document.querySelectorAll('table tbody tr');
-                if(rows.length === 0) return null; 
-                
-                let hasData = false;
-                for(let r of rows) {
-                    let rowText = r.innerText || "";
-                    // 🚀 FIX: Sirf exact numbers hi filter honge, spaces wagera nahi
-                    let numbers = rowText.match(/\\b\\d{8,}\\b/g) || [];
-                    
-                    if (numbers.length >= 2) {
-                        let req = String(numbers[0]).trim(); 
-                        let job = String(numbers[1]).trim(); 
-                        if(!results[req]) results[req] = [];
-                        if(!results[req].includes(job)) results[req].push(job);
-                        hasData = true;
-                    } else if (numbers.length === 1) {
-                        let job = String(numbers[0]).trim();
-                        let req = "UNKNOWN";
-                        if(!results[req]) results[req] = [];
-                        if(!results[req].includes(job)) results[req].push(job);
-                        hasData = true;
-                    }
-                }
-                return hasData ? results : null;
-            }
-            """
-            
-            target_frame = None
-            max_wait = 180 # 3 mins
-            start_time = time.time()
-            
-            print("⏳ XRF table load hone ka wait kar rahe hain...")
-            
-            while time.time() - start_time < max_wait:
-                if CANCEL_FETCH: break
-                for page in browser.contexts[0].pages:
-                    for frame in [page] + page.frames:
-                        try:
-                            res = frame.evaluate(js_code)
-                            if res: 
-                                target_frame = frame
-                                break
-                        except: pass
-                    if target_frame: break
-                if target_frame: break 
-                time.sleep(1) 
+            # 🚀 Exact JS Logic for the XRF "Submitted Articles List" Table
+            js_code = """
+            () => {
+                let results = {};
+                let rows = document.querySelectorAll('table tbody tr');
+                if(rows.length === 0) return null; 
+                
+                let hasData = false;
+                for(let r of rows) {
+                    let rowText = r.innerText || "";
+                    // 🚀 FIX: Sirf exact numbers hi filter honge, spaces wagera nahi
+                    let numbers = rowText.match(/\\b\\d{8,}\\b/g) || [];
+                    
+                    if (numbers.length >= 2) {
+                        let req = String(numbers[0]).trim(); 
+                        let job = String(numbers[1]).trim(); 
+                        if(!results[req]) results[req] = [];
+                        if(!results[req].includes(job)) results[req].push(job);
+                        hasData = true;
+                    } else if (numbers.length === 1) {
+                        let job = String(numbers[0]).trim();
+                        let req = "UNKNOWN";
+                        if(!results[req]) results[req] = [];
+                        if(!results[req].includes(job)) results[req].push(job);
+                        hasData = true;
+                    }
+                }
+                return hasData ? results : null;
+            }
+            """
+            
+            target_frame = None
+            max_wait = 180 # 3 mins
+            start_time = time.time()
+            
+            print("⏳ XRF table load hone ka wait kar rahe hain...")
+            
+            while time.time() - start_time < max_wait:
+                if CANCEL_FETCH: break
+                for page in browser.contexts[0].pages:
+                    for frame in [page] + page.frames:
+                        try:
+                            res = frame.evaluate(js_code)
+                            if res: 
+                                target_frame = frame
+                                break
+                        except: pass
+                    if target_frame: break
+                if target_frame: break 
+                time.sleep(1) 
 
-            if CANCEL_FETCH:
-                try: browser.disconnect()
-                except: pass
-                return {"status": "error", "msg": "🛑 Process Cancelled by User."}
+            if CANCEL_FETCH:
+                try: browser.disconnect()
+                except: pass
+                return {"status": "error", "msg": "🛑 Process Cancelled by User."}
 
-            if not target_frame:
-                try: browser.disconnect()
-                except: pass
-                return {"status": "error", "msg": "⚠️ Timeout Error: Website par XRF Table Data load nahi hua!"}
+            if not target_frame:
+                try: browser.disconnect()
+                except: pass
+                return {"status": "error", "msg": "⚠️ Timeout Error: Website par XRF Table Data load nahi hua!"}
 
-            all_data = {}
-            previous_data_state = None 
+            all_data = {}
+            previous_data_state = None 
 
-            while True:
-                if CANCEL_FETCH:
-                    print("🛑 Fetching loop cancelled by user!")
-                    break
+            while True:
+                if CANCEL_FETCH:
+                    print("🛑 Fetching loop cancelled by user!")
+                    break
 
-                res = target_frame.evaluate(js_code)
-                if res == previous_data_state:
-                    print("🛑 Aakhri page aa gaya. Loop break kar rahe hain.")
-                    break
-                    
-                if res:
-                    for req, jobs in res.items():
-                        if req not in all_data: all_data[req] = []
-                        for j in jobs:
-                            if j not in all_data[req]: all_data[req].append(j)
+                res = target_frame.evaluate(js_code)
+                if res == previous_data_state:
+                    print("🛑 Aakhri page aa gaya. Loop break kar rahe hain.")
+                    break
+                    
+                if res:
+                    for req, jobs in res.items():
+                        if req not in all_data: all_data[req] = []
+                        for j in jobs:
+                            if j not in all_data[req]: all_data[req].append(j)
 
-                previous_data_state = res 
-                
-                next_btn = target_frame.locator("a.paginate_button.next, li.next a, a:has-text('Next'), a:has-text('›'), a[title*='Next']").last
-                
-                if next_btn.count() > 0:
-                    btn_class = next_btn.get_attribute("class") or ""
-                    is_disabled = "disabled" in btn_class or next_btn.get_attribute("aria-disabled") == "true" or next_btn.get_attribute("disabled") is not None
-                    
-                    if not is_disabled:
-                        print("➡️ Agle panne (Next Page) par jaa rahe hain...")
-                        next_btn.evaluate("node => node.click()") 
-                        wait_start = time.time()
-                        while time.time() - wait_start < 10:
-                            if CANCEL_FETCH: break
-                            try:
-                                if target_frame.evaluate(js_code) != previous_data_state:
-                                    break
-                            except: pass
-                            time.sleep(0.5)
-                    else:
-                        break 
-                else:
-                    break
+                previous_data_state = res 
+                
+                next_btn = target_frame.locator("a.paginate_button.next, li.next a, a:has-text('Next'), a:has-text('›'), a[title*='Next']").last
+                
+                if next_btn.count() > 0:
+                    btn_class = next_btn.get_attribute("class") or ""
+                    is_disabled = "disabled" in btn_class or next_btn.get_attribute("aria-disabled") == "true" or next_btn.get_attribute("disabled") is not None
+                    
+                    if not is_disabled:
+                        print("➡️ Agle panne (Next Page) par jaa rahe hain...")
+                        next_btn.evaluate("node => node.click()") 
+                        wait_start = time.time()
+                        while time.time() - wait_start < 10:
+                            if CANCEL_FETCH: break
+                            try:
+                                if target_frame.evaluate(js_code) != previous_data_state:
+                                    break
+                            except: pass
+                            time.sleep(0.5)
+                    else:
+                        break 
+                else:
+                    break
 
-            try: browser.disconnect()
-            except: pass
-            
-            if CANCEL_FETCH:
-                return {"status": "error", "msg": "🛑 Process Stopped."}
+            try: browser.disconnect()
+            except: pass
+            
+            if CANCEL_FETCH:
+                return {"status": "error", "msg": "🛑 Process Stopped."}
 
-            return {"status": "success", "data": all_data}
-            
-    except Exception as e:
-        logging.error(f"XRF Scrape Error: {e}", exc_info=True)
-        return {"status": "error", "msg": str(e)}
-    finally:
-        
-        ACTIVE_BROWSER = None   
-        try:
-            if 'browser' in locals() and browser:
-                browser.disconnect()
-        except: 
-            pass
+            return {"status": "success", "data": all_data}
+            
+    except Exception as e:
+        logging.error(f"XRF Scrape Error: {e}", exc_info=True)
+        return {"status": "error", "msg": str(e)}
+    finally:
+        ACTIVE_BROWSER = None   
+        try:
+            if 'browser' in locals() and browser:
+                browser.disconnect()
+        except: 
+            pass
 # ==============================================================
 # 7. FETCH HUIDs FROM WEIGHING DESK PAGE (SMART SYNC + ALL PAGES)
 # ==============================================================
