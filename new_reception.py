@@ -877,20 +877,20 @@ def scrape_all_requests_from_xrf():
             pass
 
 # ==============================================================
-# 7. FETCH HUIDs FROM WEIGHING DESK PAGE (SMART SYNC + ALL PAGES)
+# 7. FETCH HUIDs & DATA FROM WEIGHING DESK PAGE (SMART SYNC + ALL PAGES)
 # ==============================================================
 def fetch_huids_from_page(job_id):
-    """Weighing Desk page ke SAARE pages se Tag aur HUID nikalna"""
+    """Current open Weighing Desk page se Tag, Category, Weight aur HUID nikalna"""
     global CANCEL_FETCH, ACTIVE_BROWSER
-    search_job_id = str(job_id).split('-L')[0] 
-    print(f"🔍 Smart Fetching HUIDs/Data for Job: {search_job_id}...")
+    search_job_id = str(job_id).split('-L')[0]
+    print(f"🔍 Smart Fetching Data for Job: {search_job_id}...")
     
     try:
         with sync_playwright() as p:
             try: 
                 browser = p.chromium.connect_over_cdp(CDP_URL, timeout=3000)
                 ACTIVE_BROWSER = browser
-            except: return {"status": "error", "msg": "⚠️ Secure Browser open nahi hai!"}
+            except: return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
             
             target_frame = None
             actual_job_card = None
@@ -908,8 +908,6 @@ def fetch_huids_from_page(job_id):
                 if target_frame: break
                 
             if not target_frame:
-                try: browser.disconnect()
-                except: pass
                 return {"status": "error", "msg": "⚠️ Weighing Desk page screen par load nahi hui hai."}
 
             js_code = """
@@ -918,18 +916,23 @@ def fetch_huids_from_page(job_id):
                 let rows = document.querySelectorAll('table tbody tr');
                 for (let r of rows) {
                     let cells = r.querySelectorAll('td');
+                    // Index 1=Tag, 2=Material, 3=Item Category, 4=HUID, 5=Weight
                     if (cells.length >= 6) { 
                         let tag = cells[1].innerText.trim();
                         let matCat = cells[2].innerText.trim();
                         let itemCat = cells[3].innerText.trim();
                         let huid = cells[4].innerText.trim();
-                        let weight = cells[5].innerText.trim(); 
                         
-                        if (tag && tag !== "" && tag.toUpperCase() !== "AHC TAG") {
+                        let weight = cells[5].innerText.trim(); 
+                        let wInput = cells[5].querySelector('input');
+                        if(wInput && wInput.value) weight = wInput.value.trim();
+                        
+                        if (tag && tag !== "" && !tag.toUpperCase().includes("AHC TAG") && !tag.toUpperCase().includes("NO DATA")) {
                             data.push({
                                 "tag": tag, "category": itemCat,
-                                "purity": matCat, "huid": (huid !== "-") ? huid : "",
-                                "weight": weight 
+                                "purity": matCat, 
+                                "huid": (huid !== "-") ? huid : "",
+                                "weight": (weight !== "-") ? weight : ""
                             });
                         }
                     }
@@ -941,6 +944,7 @@ def fetch_huids_from_page(job_id):
             all_data = []
             previous_data_state = None
             
+            # 🚀 TURBO FAST PAGINATION (Sare pages jaldi padhega)
             while True:
                 if CANCEL_FETCH: break
                 res = target_frame.evaluate(js_code)
@@ -959,13 +963,11 @@ def fetch_huids_from_page(job_id):
                     btn_class = next_btn.get_attribute("class") or ""
                     if "disabled" in btn_class or next_btn.get_attribute("aria-disabled") == "true":
                         break
-                        
                     next_btn.evaluate("node => node.click()")
-                    
                     t_wait = time.time()
-                    while time.time() - t_wait < 15:
+                    while time.time() - t_wait < 10:
                         if CANCEL_FETCH: break
-                        time.sleep(0.2)
+                        time.sleep(0.1) # 🚀 0.1s Fast Polling
                         try:
                             if target_frame.evaluate(js_code) != previous_data_state: break
                         except: pass
@@ -973,12 +975,22 @@ def fetch_huids_from_page(job_id):
 
             if not actual_job_card: actual_job_card = "UNKNOWN_JOB"
 
+            # 🚀 ORIGINAL MISMATCH LOGIC
             if actual_job_card == search_job_id:
+                # Agar Job Card match ho gaya, to sirf HUID aur Weight bhejega
                 tags_info = {item['tag']: {"huid": item['huid'], "weight": item.get('weight', '')} for item in all_data}
-                if len(tags_info) > 0: return {"status": "success", "data": tags_info}
-                else: return {"status": "error", "msg": "⚠️ HUID khali hai!"}
+                if len(tags_info) > 0: 
+                    return {"status": "success", "data": tags_info}
+                else: 
+                    return {"status": "error", "msg": "⚠️ Data khali hai!"}
             else:
-                return {"status": "mismatch", "actual_job": actual_job_card, "tags_data": all_data, "msg": f"Job card mismatch!"}
+                # Agar Mismatch hua, to Pura data UI ko bhej dega naya job card banane ke liye
+                return {
+                    "status": "mismatch", 
+                    "actual_job": actual_job_card, 
+                    "tags_data": all_data, 
+                    "msg": f"Job card mismatch! Software: {search_job_id}, Website: {actual_job_card}"
+                }
                 
     except Exception as e: 
         return {"status": "error", "msg": f"System Error: {str(e)}"}
