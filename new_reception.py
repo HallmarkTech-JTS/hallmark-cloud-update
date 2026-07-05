@@ -214,7 +214,7 @@ def fast_inject_weight(job_id, tag_id, weight):
 
 
 # ==============================================================
-# 3. FULL AUTO INJECTION (ULTRA FAST & LOW RAM)
+# 3. FULL AUTO INJECTION (ULTRA FAST & BULLETPROOF RETRY LOGIC)
 # ==============================================================
 def inject_reception_weight_ghost(job_id, job_data, delay_ms=400): 
     global CANCEL_FETCH, ACTIVE_BROWSER
@@ -251,6 +251,7 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
                 except: pass
                 return f"❌ Wrong Page! Site par ID '{search_job_id}' open nahi hai."
 
+            # 🚀 Sabse pehle First Page par jao taaki koi tag piche na chhoote
             try:
                 first_btn = target_frame.locator("a.paginate_button.first, li.first a, a:has-text('First')").first
                 if first_btn.count() > 0 and "disabled" not in (first_btn.get_attribute("class") or ""):
@@ -258,20 +259,23 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
                     time.sleep(1)
             except: pass
 
+            # 🚀 SMART RETRY LOOP: Jab tak tag_map khali na ho ya aakhri page na aa jaye
             while tag_map and not CANCEL_FETCH:
-                try: target_frame.wait_for_selector("td:nth-child(2)", timeout=3000)
+                try: target_frame.wait_for_selector("table tbody tr", timeout=3000)
                 except: pass
                 
                 rows = target_frame.locator("table tbody tr").all()
                 for row in rows:
                     if CANCEL_FETCH or not tag_map: break
                     try:
-                        current_tag = row.locator("td:nth-child(2), td:nth-child(3)").first.inner_text().strip()
+                        # Column 2 (AHC Tag) ko exactly read karo
+                        current_tag = row.locator("td:nth-child(2)").first.inner_text().strip()
                         if current_tag in tag_map:
                             weight = tag_map[current_tag]
                             weight_input = row.locator("input.weightCls, input.scan-input, input:not([type='hidden']):not([type='checkbox'])").first
                             
                             if weight_input.count() > 0:
+                                # 🚀 Strict JS Injection (Bina miss kiye fill karega)
                                 js_inject = f"""node => {{
                                     node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
                                     node.value = '{weight}'; 
@@ -289,30 +293,32 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
                                     time.sleep(delay_ms / 1000.0) 
                                 
                                 filled_count += 1
-                                del tag_map[current_tag] # RAM se delete
+                                del tag_map[current_tag] # RAM aur List se delete
                     except: pass
 
                 if not tag_map or CANCEL_FETCH: break 
                 
+                # 🚀 BULLETPROOF NEXT PAGE CLICK: Upar wali table ka Next button hi dabega
                 next_btn = target_frame.locator("a.paginate_button.next, a#tabWeight_next, li.next a").first
                 if next_btn.count() > 0:
                     btn_class = next_btn.get_attribute("class") or ""
                     if "disabled" in btn_class or next_btn.get_attribute("aria-disabled") == "true":
                         break
                         
-                    old_tag = ""
-                    try: old_tag = target_frame.locator("td:nth-child(2)").first.inner_text().strip()
+                    old_first_tag = ""
+                    try: old_first_tag = target_frame.locator("tbody tr td:nth-child(2)").first.inner_text().strip()
                     except: pass
 
                     next_btn.evaluate("node => node.click()")
                     
+                    # 🚀 FIX: Jab tak page sach me na palat jaye, tab tak aage nahi badhega
                     t_wait = time.time()
-                    while time.time() - t_wait < 10:
+                    while time.time() - t_wait < 5:
                         if CANCEL_FETCH: break
-                        time.sleep(0.1) # Fast polling
+                        time.sleep(0.2)
                         try:
-                            new_tag = target_frame.locator("td:nth-child(2)").first.inner_text().strip()
-                            if new_tag != old_tag: break
+                            new_first_tag = target_frame.locator("tbody tr td:nth-child(2)").first.inner_text().strip()
+                            if new_first_tag != old_first_tag and new_first_tag != "": break
                         except: pass
                 else: break
 
@@ -322,7 +328,6 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
             if CANCEL_FETCH: return f"🛑 STOPPED! {filled_count} Tags Save huye."
             return f"✅ 100% Success! Saare {filled_count} Tags FAST Save kar diye gaye."
     except Exception as e: return f"⚠️ Error: {e}"
-
 
 # ==============================================================
 # 4. DATA SCRAPING & WAIT FOR JOB CARD
