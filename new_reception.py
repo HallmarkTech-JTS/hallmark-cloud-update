@@ -294,7 +294,6 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
 
                 if not tag_map or CANCEL_FETCH: break 
                 
-                # 🚀 BUG FIX: '.last' ko '.first' me badla taaki upar wale (sahi) table ka Next button dabe
                 next_btn = target_frame.locator("a.paginate_button.next, a#tabWeight_next, li.next a").first
                 if next_btn.count() > 0:
                     btn_class = next_btn.get_attribute("class") or ""
@@ -459,13 +458,18 @@ def scrape_all_requests_from_main():
                     else: break 
                 else: break
 
-            try: browser.disconnect()
-            except: pass
-            
             if CANCEL_FETCH: return {"status": "error", "msg": "🛑 Process Stopped."}
             return {"status": "success", "data": all_data}
             
-    except Exception as e: return {"status": "error", "msg": str(e)}
+    except Exception as e: 
+        return {"status": "error", "msg": str(e)}
+    finally:
+        ACTIVE_BROWSER = None
+        try:
+            if 'browser' in locals() and browser:
+                browser.disconnect()
+        except: pass
+
 # ==============================================================
 # 5. PROCESS SELECTED REQUESTS (SINGLE TAB MANAGEMENT + BULLETPROOF)
 # ==============================================================
@@ -491,8 +495,6 @@ def process_selected_requests(selected_reqs, master_info):
                 for job in jobs:
                     if CANCEL_FETCH: break
 
-                    # 🚀 MAGIC FIX 1: Pichle saare extra tabs band karo (Confusion Khatam)
-                    # Main dashboard (index 0) ko chhodkar sab close kar do.
                     while len(context.pages) > 1:
                         try: context.pages[-1].close()
                         except: break
@@ -563,10 +565,8 @@ def process_selected_requests(selected_reqs, master_info):
                             
                     if not job_found: continue 
 
-                    # Pata lagao ki click se pehle kitne tabs khule hain
                     pages_before_click = len(context.pages)
 
-                    # 🚀 BULLETPROOF CLICK LOGIC
                     try:
                         view_btn = row.locator("a.fa-eye, a[title*='View' i], button[title*='View' i], a:has-text('View')").first
                         if view_btn.count() == 0:
@@ -579,11 +579,9 @@ def process_selected_requests(selected_reqs, master_info):
                     new_opened_page = None
                     tab_wait_start = time.time()
                     
-                    # Naya tab ya popup aane ka wait karo
                     while time.time() - tab_wait_start < 45:
                         if CANCEL_FETCH: break
                         
-                        # Agar naya tab khula hai
                         if len(context.pages) > pages_before_click:
                             new_opened_page = context.pages[-1]
                             target_new_frame = new_opened_page
@@ -594,7 +592,6 @@ def process_selected_requests(selected_reqs, master_info):
                                     break
                             except: pass
                         else:
-                            # Agar naya tab nahi khula aur same page par popup aaya hai
                             for frame in [context.pages[0]] + context.pages[0].frames:
                                 try:
                                     if frame.locator("th:has-text('TAG ID'), td:has-text('TAG ID'), th:has-text('AHC TAG')").count() > 0:
@@ -606,13 +603,13 @@ def process_selected_requests(selected_reqs, master_info):
                         
                     if not target_new_frame: continue 
 
-                    # Network load hone ka wait (Khali table ki problem solve karega)
+                    # 🚀 TURBO FIX: Faltu Network ka wait nahi karega, sirf table aane ka wait karega
                     try:
-                        actual_page = target_new_frame if not hasattr(target_new_frame, 'page') else target_new_frame.page
-                        actual_page.wait_for_load_state("networkidle", timeout=4000)
+                        # Jaise hi table ka header dikhega, 0.1 second me data nikalna shuru kar dega
+                        target_new_frame.wait_for_selector("th:has-text('TAG ID'), td:has-text('TAG ID'), th:has-text('AHC TAG')", timeout=3000)
                     except: pass
                     
-                    time.sleep(2) 
+                    time.sleep(0.3) # 🚀 2 second ke wait ko ghatakar sirf 0.3 second kar diya 
 
                     js_code_tags = """
                     () => {
@@ -687,19 +684,16 @@ def process_selected_requests(selected_reqs, master_info):
                             else: break
                         else: break 
 
-                    # 🚀 MAGIC FIX 2: Sirf jo naya tab khula tha usko safely band karo
                     if new_opened_page:
                         try: new_opened_page.close()
                         except: pass
                     else:
-                        # 🚀 XRF PAGE FIX: Agar same tab me details open hui hain, to "Go Back" dabao
                         try:
                             go_back_btn = target_new_frame.locator("a:has-text('Go Back'), button:has-text('Go Back'), a:has-text('Back')").first
                             if go_back_btn.count() > 0:
                                 go_back_btn.evaluate("node => node.click()")
-                                time.sleep(2.0) # Wapas main dashboard load hone ka wait karega
+                                time.sleep(0.5) 
                             else:
-                                # Agar Popup tha toh use JS se close karo
                                 close_js = """() => {
                                     let closeBtn = document.querySelector("button.close, button[data-dismiss='modal'], a.close");
                                     if (closeBtn) { closeBtn.click(); return true; }
@@ -708,30 +702,43 @@ def process_selected_requests(selected_reqs, master_info):
                                 target_new_frame.evaluate(close_js)
                         except: pass
                         
-                    time.sleep(1) # Agle Job Card par jaane se pehle 1 second ki saans
+                    time.sleep(1) 
 
-                    # 🚀 DATABASE SAVE & RAM OPTIMIZATION
                     if all_scraped_items and not CANCEL_FETCH:
                         lot_dict = split_tags_into_lots(job, all_scraped_items)
                         for lot_job_id, tags_chunk in lot_dict.items():
                             db.save_scraped_job_card(lot_job_id, tags_chunk, request_no=req)
                         total_jobs_saved += 1
                         
-                    # RAM saaf karein
                     all_scraped_items.clear() 
                     gc.collect() 
+                    
+                # 🚀 FIX: Search Box ko clear karo taaki agla fetch block na ho
+                if target_frame:
+                    try:
+                        search_box = target_frame.locator("input[type='search'], input.form-control.input-sm").first
+                        if search_box.count() > 0:
+                            search_box.fill("")
+                            search_box.press("Enter")
+                            time.sleep(1)
+                    except: pass
 
                 gc.collect() 
 
-            try: browser.disconnect()
-            except: pass
-            
             if CANCEL_FETCH: return {"status": "error", "msg": f"🛑 Cancelled! {total_jobs_saved} Jobs database me save huye."}
             if total_jobs_saved == 0: return {"status": "error", "msg": "⚠️ Data Fetch Fail! (Ya toh tags nahi the ya galat button daba)"}
                 
             return {"status": "success", "msg": f"✅ {total_jobs_saved} Jobs Database mein Lot-Wise save ho gaye!"}
             
-    except Exception as e: return {"status": "error", "msg": str(e)}
+    except Exception as e: 
+        return {"status": "error", "msg": str(e)}
+    finally:
+        ACTIVE_BROWSER = None
+        try:
+            if 'browser' in locals() and browser:
+                browser.disconnect()
+        except: pass
+
 # ==============================================================
 # 🌟 5. NEW: SCRAPE REQUESTS FROM XRF PAGE (BACKUP FETCH)
 # ==============================================================
@@ -748,7 +755,6 @@ def scrape_all_requests_from_xrf():
                 ACTIVE_BROWSER = browser
             except: return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
 
-            # 🚀 Exact JS Logic for the XRF "Submitted Articles List" Table
             js_code = """
             () => {
                 let results = {};
@@ -758,7 +764,6 @@ def scrape_all_requests_from_xrf():
                 let hasData = false;
                 for(let r of rows) {
                     let rowText = r.innerText || "";
-                    // 🚀 FIX: Sirf exact numbers hi filter honge, spaces wagera nahi
                     let numbers = rowText.match(/\\b\\d{8,}\\b/g) || [];
                     
                     if (numbers.length >= 2) {
@@ -852,9 +857,6 @@ def scrape_all_requests_from_xrf():
                 else:
                     break
 
-            try: browser.disconnect()
-            except: pass
-            
             if CANCEL_FETCH:
                 return {"status": "error", "msg": "🛑 Process Stopped."}
 
@@ -870,6 +872,7 @@ def scrape_all_requests_from_xrf():
                 browser.disconnect()
         except: 
             pass
+
 # ==============================================================
 # 7. FETCH HUIDs FROM WEIGHING DESK PAGE (SMART SYNC + ALL PAGES)
 # ==============================================================
@@ -912,19 +915,18 @@ def fetch_huids_from_page(job_id):
                 let rows = document.querySelectorAll('table tbody tr');
                 for (let r of rows) {
                     let cells = r.querySelectorAll('td');
-                    // 🚀 FIX: 6 Columns check karega taaki Weight bhi nikal sake
                     if (cells.length >= 6) { 
                         let tag = cells[1].innerText.trim();
                         let matCat = cells[2].innerText.trim();
                         let itemCat = cells[3].innerText.trim();
                         let huid = cells[4].innerText.trim();
-                        let weight = cells[5].innerText.trim(); // 🚀 NAYA: Weight nikal liya
+                        let weight = cells[5].innerText.trim(); 
                         
                         if (tag && tag !== "" && tag.toUpperCase() !== "AHC TAG") {
                             data.push({
                                 "tag": tag, "category": itemCat,
                                 "purity": matCat, "huid": (huid !== "-") ? huid : "",
-                                "weight": weight // 🚀 NAYA: Data me weight bhej diya
+                                "weight": weight 
                             });
                         }
                     }
@@ -936,7 +938,6 @@ def fetch_huids_from_page(job_id):
             all_data = []
             previous_data_state = None
             
-            # 🚀 BUG FIX: Ab ye saare pages par jaakar data nikalega
             while True:
                 if CANCEL_FETCH: break
                 res = target_frame.evaluate(js_code)
@@ -958,7 +959,6 @@ def fetch_huids_from_page(job_id):
                         
                     next_btn.evaluate("node => node.click()")
                     
-                    # Fast Polling (0.2s)
                     t_wait = time.time()
                     while time.time() - t_wait < 15:
                         if CANCEL_FETCH: break
@@ -968,16 +968,20 @@ def fetch_huids_from_page(job_id):
                         except: pass
                 else: break
 
-            try: browser.disconnect()
-            except: pass
-            
             if not actual_job_card: actual_job_card = "UNKNOWN_JOB"
 
             if actual_job_card == search_job_id:
-                # 🚀 FIX: Ab HUID ke sath Weight bhi bhejna hai
                 tags_info = {item['tag']: {"huid": item['huid'], "weight": item.get('weight', '')} for item in all_data}
                 if len(tags_info) > 0: return {"status": "success", "data": tags_info}
                 else: return {"status": "error", "msg": "⚠️ HUID khali hai!"}
             else:
                 return {"status": "mismatch", "actual_job": actual_job_card, "tags_data": all_data, "msg": f"Job card mismatch!"}
-    except Exception as e: return {"status": "error", "msg": f"System Error: {str(e)}"}
+                
+    except Exception as e: 
+        return {"status": "error", "msg": f"System Error: {str(e)}"}
+    finally:
+        ACTIVE_BROWSER = None
+        try:
+            if 'browser' in locals() and browser:
+                browser.disconnect()
+        except: pass
