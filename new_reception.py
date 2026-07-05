@@ -805,7 +805,7 @@ def scrape_all_requests_from_xrf():
                         except: pass
                     if target_frame: break
                 if target_frame: break 
-                time.sleep(1) 
+                time.sleep(0.2) # 🚀 TURBO FIX: 1s se ghatakar 0.2s kar diya 
 
             if CANCEL_FETCH:
                 try: browser.disconnect()
@@ -854,7 +854,7 @@ def scrape_all_requests_from_xrf():
                                 if target_frame.evaluate(js_code) != previous_data_state:
                                     break
                             except: pass
-                            time.sleep(0.5)
+                            time.sleep(0.1) # 🚀 TURBO FIX: 0.5s se ghatakar seedha 0.1s kar diya
                     else:
                         break 
                 else:
