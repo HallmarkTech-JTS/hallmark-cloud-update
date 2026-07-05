@@ -495,10 +495,8 @@ def process_selected_requests(selected_reqs, master_info):
                 for job in jobs:
                     if CANCEL_FETCH: break
 
-                    while len(context.pages) > 1:
-                        try: context.pages[-1].close()
-                        except: break
-                    time.sleep(0.5) 
+                    # 🚀 SMART FIX: Faltu tabs ko ab zabardasti band nahi karenge.
+                    # Seedha sahi dashboard dhoondhenge.
                     
                     target_frame = None
                     wait_start_time = time.time()
@@ -565,7 +563,8 @@ def process_selected_requests(selected_reqs, master_info):
                             
                     if not job_found: continue 
 
-                    pages_before_click = len(context.pages)
+                    # 🚀 SMART TRACKING: Pata lagao ki click se pehle kaun-kaun se tabs khule hain
+                    existing_pages = set(context.pages)
 
                     try:
                         view_btn = row.locator("a.fa-eye, a[title*='View' i], button[title*='View' i], a:has-text('View')").first
@@ -582,8 +581,12 @@ def process_selected_requests(selected_reqs, master_info):
                     while time.time() - tab_wait_start < 45:
                         if CANCEL_FETCH: break
                         
-                        if len(context.pages) > pages_before_click:
-                            new_opened_page = context.pages[-1]
+                        # 🚀 FOOLPROOF LOGIC: Sirf wahi naya tab pakdega jo is click se khula hai
+                        current_pages = set(context.pages)
+                        new_pages = current_pages - existing_pages
+                        
+                        if new_pages:
+                            new_opened_page = list(new_pages)[0]
                             target_new_frame = new_opened_page
                         
                         if target_new_frame:
