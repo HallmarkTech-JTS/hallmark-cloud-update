@@ -882,7 +882,7 @@ def scrape_all_requests_from_xrf():
 def fetch_huids_from_page(job_id):
     """Current open Weighing Desk page se Tag, Category, Weight aur HUID nikalna"""
     global CANCEL_FETCH, ACTIVE_BROWSER
-    search_job_id = str(job_id).split('-L')[0]
+    search_job_id = str(job_id).split('-L')[0] if job_id else ""
     print(f"🔍 Smart Fetching Data for Job: {search_job_id}...")
     
     try:
@@ -958,12 +958,19 @@ def fetch_huids_from_page(job_id):
                 
                 previous_data_state = res
                 
-                next_btn = target_frame.locator("a.paginate_button.next, a#tabWeight_next, li.next a, a:has-text('Next')").last
+                # 🚀 FIX: Yahan '.last' ki jagah '.first' kar diya hai.
+                # Ab ye hamesha UPAR wala Next button hi dabayega.
+                next_btn = target_frame.locator("a.paginate_button.next, a#tabWeight_next, li.next a, a:has-text('Next')").first
+                
                 if next_btn.count() > 0:
                     btn_class = next_btn.get_attribute("class") or ""
-                    if "disabled" in btn_class or next_btn.get_attribute("aria-disabled") == "true":
+                    is_disabled = "disabled" in btn_class or next_btn.get_attribute("aria-disabled") == "true" or next_btn.get_attribute("disabled") is not None
+                    
+                    if is_disabled:
                         break
+                        
                     next_btn.evaluate("node => node.click()")
+                    
                     t_wait = time.time()
                     while time.time() - t_wait < 10:
                         if CANCEL_FETCH: break
@@ -971,25 +978,25 @@ def fetch_huids_from_page(job_id):
                         try:
                             if target_frame.evaluate(js_code) != previous_data_state: break
                         except: pass
-                else: break
+                else: 
+                    break
 
             if not actual_job_card: actual_job_card = "UNKNOWN_JOB"
 
             # 🚀 ORIGINAL MISMATCH LOGIC
-            if actual_job_card == search_job_id:
-                # Agar Job Card match ho gaya, to sirf HUID aur Weight bhejega
+            if search_job_id and actual_job_card == search_job_id:
                 tags_info = {item['tag']: {"huid": item['huid'], "weight": item.get('weight', '')} for item in all_data}
                 if len(tags_info) > 0: 
                     return {"status": "success", "data": tags_info}
                 else: 
                     return {"status": "error", "msg": "⚠️ Data khali hai!"}
             else:
-                # Agar Mismatch hua, to Pura data UI ko bhej dega naya job card banane ke liye
+                msg_text = f"Job card mismatch! Software: {search_job_id}, Website: {actual_job_card}" if search_job_id else f"Website par Job Card '{actual_job_card}' khula hai."
                 return {
                     "status": "mismatch", 
                     "actual_job": actual_job_card, 
                     "tags_data": all_data, 
-                    "msg": f"Job card mismatch! Software: {search_job_id}, Website: {actual_job_card}"
+                    "msg": msg_text
                 }
                 
     except Exception as e: 
