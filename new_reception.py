@@ -211,8 +211,6 @@ def fast_inject_weight(job_id, tag_id, weight):
     except Exception as e:
         logging.error(f"Fast Inject Error: {e}", exc_info=True)
         return {"status": "error", "msg": f"⚠️ Error: {str(e)}"}
-
-
 # ==============================================================
 # 3. FULL AUTO INJECTION (ULTRA FAST & BULLETPROOF RETRY LOGIC)
 # ==============================================================
@@ -224,7 +222,7 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
     if not job_data: return "⚠️ डेटाबेस खाली है।"
     print(f"🚀 Ultra-Fast Auto Injection Started... Job: {search_job_id}")
 
-    # O(1) Speed ke liye Dictionary (Bina PC hang kiye fast injection)
+    # O(1) Speed ke liye Dictionary
     tag_map = {str(item[0]).strip(): str(item[1]).strip() for item in job_data if str(item[1]).strip() not in ["0", "0.0", ""]}
     if not tag_map: return "⚠️ Koi valid weight (0.0 ke alawa) nahi mila inject karne ke liye."
     
@@ -251,7 +249,7 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
                 except: pass
                 return f"❌ Wrong Page! Site par ID '{search_job_id}' open nahi hai."
 
-            # 🚀 Sabse pehle First Page par jao taaki koi tag piche na chhoote
+            # Sabse pehle First Page par jao
             try:
                 first_btn = target_frame.locator("a.paginate_button.first, li.first a, a:has-text('First')").first
                 if first_btn.count() > 0 and "disabled" not in (first_btn.get_attribute("class") or ""):
@@ -259,23 +257,25 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
                     time.sleep(1)
             except: pass
 
-            # 🚀 SMART RETRY LOOP: Jab tak tag_map khali na ho ya aakhri page na aa jaye
             while tag_map and not CANCEL_FETCH:
                 try: target_frame.wait_for_selector("table tbody tr", timeout=3000)
                 except: pass
                 
-                rows = target_frame.locator("table tbody tr").all()
-                for row in rows:
+                # 🚀 FIX: .all() ki jagah ab Index (.nth) ke hisaab se fresh data padhega
+                row_count = target_frame.locator("table tbody tr").count()
+                
+                for i in range(row_count):
                     if CANCEL_FETCH or not tag_map: break
                     try:
-                        # Column 2 (AHC Tag) ko exactly read karo
+                        # 🚀 NAYA LOGIC: Har baar table se fresh row uthayega, kabhi error nahi aayega
+                        row = target_frame.locator("table tbody tr").nth(i)
                         current_tag = row.locator("td:nth-child(2)").first.inner_text().strip()
+                        
                         if current_tag in tag_map:
                             weight = tag_map[current_tag]
                             weight_input = row.locator("input.weightCls, input.scan-input, input:not([type='hidden']):not([type='checkbox'])").first
                             
                             if weight_input.count() > 0:
-                                # 🚀 Strict JS Injection (Bina miss kiye fill karega)
                                 js_inject = f"""node => {{
                                     node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
                                     node.value = '{weight}'; 
@@ -285,7 +285,7 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
                                 }}"""
                                 weight_input.evaluate(js_inject)
                                 
-                                save_btn = row.locator("text='Save'").first
+                                save_btn = row.locator("text='Save', a.btn-primary, button.btn-primary").first
                                 if save_btn.is_visible():
                                     main_page = target_frame if hasattr(target_frame, 'once') else target_frame.page
                                     main_page.once("dialog", lambda dialog: dialog.accept())
@@ -294,11 +294,12 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
                                 
                                 filled_count += 1
                                 del tag_map[current_tag] # RAM aur List se delete
-                    except: pass
+                    except Exception as e: 
+                        # Agar kisi karan ek row par error aaye, to loop toote nahi balki skip karke agle par jaye
+                        pass
 
                 if not tag_map or CANCEL_FETCH: break 
                 
-                # 🚀 BULLETPROOF NEXT PAGE CLICK: Upar wali table ka Next button hi dabega
                 next_btn = target_frame.locator("a.paginate_button.next, a#tabWeight_next, li.next a").first
                 if next_btn.count() > 0:
                     btn_class = next_btn.get_attribute("class") or ""
@@ -311,7 +312,6 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
 
                     next_btn.evaluate("node => node.click()")
                     
-                    # 🚀 FIX: Jab tak page sach me na palat jaye, tab tak aage nahi badhega
                     t_wait = time.time()
                     while time.time() - t_wait < 5:
                         if CANCEL_FETCH: break
@@ -328,7 +328,6 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
             if CANCEL_FETCH: return f"🛑 STOPPED! {filled_count} Tags Save huye."
             return f"✅ 100% Success! Saare {filled_count} Tags FAST Save kar diye gaye."
     except Exception as e: return f"⚠️ Error: {e}"
-
 # ==============================================================
 # 4. DATA SCRAPING & WAIT FOR JOB CARD
 # ==============================================================
