@@ -110,7 +110,10 @@ def inject_single_reception_tag(job_id, tag_id, weight):
                 return {"status": "error", "msg": f"⚠️ Tag '{tag_id}' nahi mila."}
 
             # 🚀 NAYI LINE (Strict Match: Sirf Column 2 ya 3 me Tag ID dhundhega)
-            row = target_frame.locator("tr").filter(has=target_frame.locator("td:nth-child(2), td:nth-child(3)").get_by_text(tag_id,exact=True))
+            # 🚀 NAYA FIX: S.No (1,2,3) aur Tag ID mix na ho, isliye strictly .tagIdCls use karenge
+            row = target_frame.locator("tr").filter(has=target_frame.locator(".tagIdCls").get_by_text(tag_id, exact=True))
+            if row.count() == 0: # Backup ke liye
+                row = target_frame.locator("tr").filter(has=target_frame.locator("td:nth-child(2)").get_by_text(tag_id, exact=True))
             
             if row.count() > 0:
                 target_row = row.first
@@ -180,7 +183,10 @@ def fast_inject_weight(job_id, tag_id, weight):
                 return {"status": "error", "msg": f"⚠️ Tag '{tag_id}' list me nahi mila."}
 
             # 🚀 NAYI LINE (Strict Match: Sirf Column 2 ya 3 me Tag ID dhundhega)
-            row = target_frame.locator("tr").filter(has=target_frame.locator("td:nth-child(2), td:nth-child(3)").get_by_text(tag_id, exact=True))
+            # 🚀 NAYA FIX: S.No (1,2,3) aur Tag ID mix na ho, isliye strictly .tagIdCls use karenge
+            row = target_frame.locator("tr").filter(has=target_frame.locator(".tagIdCls").get_by_text(tag_id, exact=True))
+            if row.count() == 0: 
+                row = target_frame.locator("tr").filter(has=target_frame.locator("td:nth-child(2)").get_by_text(tag_id, exact=True))
             
             if row.count() > 0:
                 weight_input = row.first.locator("input.weightCls, input.scan-input, input[name='articlWeight'], input:not([type='hidden']):not([type='checkbox'])").first
@@ -268,7 +274,13 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
                     if CANCEL_FETCH or not tag_map: break
                     try:
                         row = target_frame.locator("table tbody tr").nth(i)
-                        current_tag = row.locator("td:nth-child(2)").first.inner_text().strip()
+                        
+                        # 🚀 NAYA FIX: Tag ID aur S.No. (1, 2, 3...) apas me mix na ho!
+                        tag_cell = row.locator(".tagIdCls").first
+                        if tag_cell.count() > 0:
+                            current_tag = tag_cell.inner_text().strip()
+                        else:
+                            current_tag = row.locator("td:nth-child(2)").first.inner_text().strip()
                         
                         if current_tag in tag_map:
                             weight = tag_map[current_tag]
@@ -285,43 +297,51 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
                                 }}"""
                                 weight_input.evaluate(js_inject)
                                 
-                                # 2. सेफ़ क्लिक और पॉपअप हैंडलर
-                                try:
-                                    main_page = target_frame.page if hasattr(target_frame, 'page') else target_frame
-                                    main_page.once("dialog", lambda dialog: dialog.accept()) # Popup turant OK karega
-                                    
-                                    # Photo ke hisaab se sabse majboot Button Locator
-                                    save_btn = row.locator(".saveWeight, .btn-primary, button:has-text('Save')").first
-                                    if save_btn.count() > 0:
-                                        # 🚀 FIX: Native click with 'no_wait_after' taaki Popup aane par code crash/hang na ho!
-                                        save_btn.click(force=True, no_wait_after=True)
-                                except Exception as e:
-                                    print(f"Click Exception: {e}")
-
-                                # 3. प्रोसेसिंग का स्मार्ट वेट (Smart Wait)
-                                start_wait = time.time()
-                                time.sleep(0.2) 
+                                # 2. 🚀 STRICT POPUP & SAVE LOGIC (Time-Based Sync)
+                                main_page = target_frame.page if hasattr(target_frame, 'page') else target_frame
+                                save_btn = row.locator(".saveWeight, .btn-primary, button:has-text('Save')").first
                                 
-                                while time.time() - start_wait < 3.0: 
+                                if save_btn.count() > 0:
                                     try:
-                                        is_processing = target_frame.evaluate("""() => {
-                                            let text = document.body.innerText.replace(/\\s/g, '').toUpperCase();
-                                            return text.includes('PROCESSING');
-                                        }""")
-                                        if is_processing:
-                                            time.sleep(0.1) 
-                                        else:
-                                            break 
-                                    except:
-                                        break
+                                        # 🚀 FIX 1: Jab tak Popup (OK) nahi aata, script yahin ruki rahegi!
+                                        with main_page.expect_event("dialog", timeout=3000) as dialog_info:
+                                            save_btn.evaluate("node => node.click()")
                                         
+                                        # 🚀 FIX 2: Popup aate hi usko OK (Accept) karegi
+                                        dialog_info.value.accept()
+                                    except Exception as e:
+                                        # Agar popup aane me timeout ho, to backup tarika
+                                        try: main_page.once("dialog", lambda dialog: dialog.accept())
+                                        except: pass
+                                        try: save_btn.evaluate("node => node.click()")
+                                        except: pass
+
+                                    # 🚀 FIX 3: OK dabane ke baad 0.5 second ka fix time wait!
+                                    # Isse website ko 'PROCESSING...' screen par laane ka proper time mil jayega.
+                                    time.sleep(0.5)
+                                    
+                                    # 3. प्रोसेसिंग का स्ट्रिक्ट वेट (Strict Wait)
+                                    start_wait = time.time()
+                                    while time.time() - start_wait < 5.0: # 5 seconds max safety
+                                        try:
+                                            is_processing = target_frame.evaluate("""() => {
+                                                let text = document.body.innerText.replace(/\\s/g, '').toUpperCase();
+                                                return text.includes('PROCESSING');
+                                            }""")
+                                            
+                                            if is_processing:
+                                                time.sleep(0.2) # Agar processing chal rahi hai to script chup-chap ruki rahegi
+                                            else:
+                                                break # Processing khatam hote hi wait loop se bahar
+                                        except:
+                                            break
+                                            
                                 filled_count += 1
                                 del tag_map[current_tag]
                                 made_save_on_this_page = True
                                 
-                                # 🚀 100% GUARANTEED BREAK: 
-                                # Ab chahe error aaye ya website slow ho, yeh loop ko yahin tod dega! 
-                                # Isse kabhi bhi doosra box ek sath nahi bharega.
+                                # 🚀 100% GUARANTEED BREAK:
+                                # Ek wazan bhara -> Save dabaya -> Popup ka wait kiya -> OK kiya -> Processing ka wait kiya -> BREAK!
                                 break 
                                 
                     except Exception as e: 
