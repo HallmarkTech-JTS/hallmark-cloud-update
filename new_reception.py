@@ -297,28 +297,21 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
                                 }}"""
                                 weight_input.evaluate(js_inject)
                                 
-                                # 2. 🚀 STRICT POPUP & SAVE LOGIC (Time-Based Sync)
+                                # 2. 🚀 STRICT POPUP & SAVE LOGIC (Auto-OK Without Freeze)
                                 main_page = target_frame.page if hasattr(target_frame, 'page') else target_frame
                                 save_btn = row.locator(".saveWeight, .btn-primary, button:has-text('Save')").first
                                 
                                 if save_btn.count() > 0:
-                                    try:
-                                        # 🚀 FIX 1: Jab tak Popup (OK) nahi aata, script yahin ruki rahegi!
-                                        with main_page.expect_event("dialog", timeout=3000) as dialog_info:
-                                            save_btn.evaluate("node => node.click()")
-                                        
-                                        # 🚀 FIX 2: Popup aate hi usko OK (Accept) karegi
-                                        dialog_info.value.accept()
-                                    except Exception as e:
-                                        # Agar popup aane me timeout ho, to backup tarika
-                                        try: main_page.once("dialog", lambda dialog: dialog.accept())
-                                        except: pass
-                                        try: save_btn.evaluate("node => node.click()")
-                                        except: pass
-
-                                    # 🚀 FIX 3: OK dabane ke baad 0.5 second ka fix time wait!
-                                    # Isse website ko 'PROCESSING...' screen par laane ka proper time mil jayega.
-                                    time.sleep(0.5)
+                                    # 🚀 FIX 1: Event Listener jo Popup aate hi AUTO-OK (Accept) dabayega
+                                    try: main_page.once("dialog", lambda dialog: dialog.accept())
+                                    except: pass
+                                    
+                                    # 🚀 FIX 2: Smart Async Click (Isse code OK button par hang nahi hoga)
+                                    # setTimeout(..., 50) ka matlab hai 50ms ke baad click hoga, taaki python script aage badh sake
+                                    save_btn.evaluate("node => setTimeout(() => node.click(), 50)")
+                                    
+                                    # 🚀 FIX 3: Click aur OK hone ka halka sa wait taaki Processing start ho sake
+                                    time.sleep(0.8)
                                     
                                     # 3. प्रोसेसिंग का स्ट्रिक्ट वेट (Strict Wait)
                                     start_wait = time.time()
