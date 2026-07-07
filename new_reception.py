@@ -290,14 +290,30 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
                                     main_page.once("dialog", lambda dialog: dialog.accept())
                                     save_btn.evaluate("node => node.click()")
                                     
-                                    # 🚀 MAIN FIX: Save dabane ke baad "PROCESSING..." ka thoda wait karo (Kam se kam 1.5s)
-                                    time.sleep(max(1.5, delay_ms / 1000.0)) 
+                                    # 🚀 SMART DYNAMIC WAIT (Fast PC ke liye)
+                                    start_wait = time.time()
+                                    time.sleep(0.1) # UI update hone ke liye halka sa gap
                                     
+                                    while time.time() - start_wait < 3.0: # Max 3 second ki safety limit
+                                        try:
+                                            # JS se check karega ki screen par "PROCESSING" likha hai ya nahi (Spaces hata kar check karega)
+                                            is_processing = target_frame.evaluate("""() => {
+                                                let text = document.body.innerText.replace(/\\s/g, '').toUpperCase();
+                                                return text.includes('PROCESSING');
+                                            }""")
+                                            
+                                            if is_processing:
+                                                time.sleep(0.05) # 0.05s ki ultra-fast polling jab tak processing chal rahi hai
+                                            else:
+                                                break # Gayab hote hi turant loop tod dega aur agla tag bharega!
+                                        except:
+                                            break
+                                            
                                     filled_count += 1
                                     del tag_map[current_tag]
                                     made_save_on_this_page = True
                                     
-                                    # 🚀 FIX: Turant loop tod do taaki Refresh ke baad baaki Tags khali na ho jaye
+                                    # Turant loop tod do taaki Refresh ke baad naya box pakad sake
                                     break 
                                     
                     except Exception as e: 
