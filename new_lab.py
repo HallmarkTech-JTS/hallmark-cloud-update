@@ -36,10 +36,19 @@ def inject_lab_weight_ghost(formatted_data):
     if not formatted_data: return "⚠️ Error: Data is empty!"
     
     excel_job_card = str(formatted_data.get("excel_job_card", ""))
-    # 🚀 Yahan Lot (-L) filter hoga website pe dhoondhne ke liye
-    actual_site_job_card = excel_job_card.split('-L')[0].strip()
     
-    print(f"👻 Ghost Injecting Lab for Job: {actual_site_job_card} (Original Lot: {excel_job_card})")
+    # 🚀 SMART LOT EXTRACTION: Job card aur uske Lot number ko alag-alag karo
+    if "-L" in excel_job_card:
+        parts = excel_job_card.split('-L')
+        actual_site_job_card = parts[0].strip()
+        lot_number = parts[1].strip() # e.g., '1' ya '2'
+    else:
+        actual_site_job_card = excel_job_card.strip()
+        lot_number = "1" # Agar koi L nahi likha hai, to default Lot 1 manenge
+        
+    expected_lot_string = f"LOT {lot_number}"
+    
+    print(f"👻 Ghost Injecting Lab for Job: {actual_site_job_card} | Expected Lot: {expected_lot_string}")
 
     try:
         with sync_playwright() as p:
@@ -47,40 +56,36 @@ def inject_lab_weight_ghost(formatted_data):
             except: return "⚠️ Error: Browser open nahi hai!"
             
             bis_page = None
-            for page in browser.contexts[0].pages:
+            wrong_lot_error = False
+            time.sleep(1) # Tab load hone ka wait
+            
+            for page in browser.contexts[0].pages[::-1]:
                 for frame in [page] + page.frames:
                     try:
-                        text = frame.locator("body").inner_text()
-                        if "Sample Details" in text and "Observation" in text:
-                            bis_page = frame
-                            break
+                        text = frame.locator("body").inner_text().upper()
+                        
+                        if "FIRE ASSAYING" in text or "WEIGHT OF CORNET" in text:
+                            # 1. Pehle base Job Card check karo
+                            if actual_site_job_card in text:
+                                # 2. Fir strictly Lot Number check karo (e.g., 'LOT 1' ya 'LOT 2')
+                                if expected_lot_string in text:
+                                    bis_page = frame
+                                    break
+                                else:
+                                    # Job match ho gaya par Lot match nahi hua
+                                    wrong_lot_error = True
                     except: pass
                 if bis_page: break
             
             if not bis_page:
                 try: browser.disconnect() 
                 except: pass
-                return "❌ अलर्ट: Assaying Observation पेज नहीं मिला!"
-
-            search_box = bis_page.locator("input[type='search']")
-            if search_box.count() > 0:
-                search_box.fill(actual_site_job_card)
-                bis_page.wait_for_timeout(1000)
-            else:
-                for page in browser.contexts[0].pages:
-                    if "Assaying Observation" in page.title():
-                        try:
-                            site_job_card = page.locator("body").inner_text()
-                            if actual_site_job_card in site_job_card:
-                                bis_page = page; break 
-                        except: continue 
-                    else:
-                        bis_page = page; break
-            
-            if not bis_page:
-                try: browser.disconnect() 
-                except: pass
-                return f"❌ अलर्ट: Job Card '{actual_site_job_card}' साइट पर मैच नहीं हुआ!"
+                
+                # 🚀 SMART ERROR MESSAGE: User ko exactly batao ki usne Lot me galti ki hai
+                if wrong_lot_error:
+                    return f"❌ अलर्ट: जॉब कार्ड '{actual_site_job_card}' तो मिल गया, लेकिन साइट पर '{expected_lot_string}' सेलेक्टेड नहीं है! कृपया वेबसाइट पर सही Lot चुनें।"
+                else:
+                    return f"❌ अलर्ट: Job Card '{actual_site_job_card}' का लैब फॉर्म स्क्रीन पर नहीं मिला! कृपया सही पेज खोलें।"
 
             if formatted_data.get("sample_drawn_wt") and formatted_data.get("button_wt"):
                 try:
