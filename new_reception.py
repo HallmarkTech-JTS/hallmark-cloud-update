@@ -261,13 +261,12 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
                 try: target_frame.wait_for_selector("table tbody tr", timeout=3000)
                 except: pass
                 
-                # 🚀 FIX: .all() ki jagah ab Index (.nth) ke hisaab se fresh data padhega
                 row_count = target_frame.locator("table tbody tr").count()
+                made_save_on_this_page = False # 🚀 NAYA FIX: Track karo ki kya is page par abhi koi Save hua hai
                 
                 for i in range(row_count):
                     if CANCEL_FETCH or not tag_map: break
                     try:
-                        # 🚀 NAYA LOGIC: Har baar table se fresh row uthayega, kabhi error nahi aayega
                         row = target_frame.locator("table tbody tr").nth(i)
                         current_tag = row.locator("td:nth-child(2)").first.inner_text().strip()
                         
@@ -290,15 +289,25 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
                                     main_page = target_frame if hasattr(target_frame, 'once') else target_frame.page
                                     main_page.once("dialog", lambda dialog: dialog.accept())
                                     save_btn.evaluate("node => node.click()")
-                                    time.sleep(delay_ms / 1000.0) 
-                                
-                                filled_count += 1
-                                del tag_map[current_tag] # RAM aur List se delete
+                                    
+                                    # 🚀 MAIN FIX: Save dabane ke baad "PROCESSING..." ka thoda wait karo (Kam se kam 1.5s)
+                                    time.sleep(max(1.5, delay_ms / 1000.0)) 
+                                    
+                                    filled_count += 1
+                                    del tag_map[current_tag]
+                                    made_save_on_this_page = True
+                                    
+                                    # 🚀 FIX: Turant loop tod do taaki Refresh ke baad baaki Tags khali na ho jaye
+                                    break 
+                                    
                     except Exception as e: 
-                        # Agar kisi karan ek row par error aaye, to loop toote nahi balki skip karke agle par jaye
                         pass
 
                 if not tag_map or CANCEL_FETCH: break 
+                
+                # 🚀 NAYA FIX: Agar Save dabaya hai to 'Next' button mat dabao, wapas shuru se isi page ko padho
+                if made_save_on_this_page:
+                    continue
                 
                 next_btn = target_frame.locator("a.paginate_button.next, a#tabWeight_next, li.next a").first
                 if next_btn.count() > 0:
