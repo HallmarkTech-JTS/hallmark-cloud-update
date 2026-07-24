@@ -149,14 +149,34 @@ def inject_lab_weight_ghost(lab_data=None):
             for page in browser.contexts[0].pages[::-1]:
                 for frame in [page] + page.frames:
                     try:
-                        text = frame.locator("body").inner_text().upper()
-                        if "FIRE ASSAYING" in text or "WEIGHT OF CORNET" in text:
-                            # 1. Pehle base Job Card check karo
-                            if actual_site_job_card in text:
-                                # 2. Fir strictly Lot Number check karo (e.g., 'LOT 1' ya 'LOT 2')
+                        # 🚀 CRITICAL FIX: Pehle check karo ki is frame me Lab inputs hain ya nahi
+                        if frame.locator("input#num_scrap_weight").count() > 0 or frame.locator("input#buttonweight").count() > 0:
+                            text = frame.locator("body").inner_text().upper()
+                            
+                            # 🚀 BUG FIX: Sidebar bypass logic (Strict Job Card Verification)
+                            is_active_job = False
+                            
+                            # Check 1: Agar Job Card kisi Input Box ki value hai (Most Reliable in BIS)
+                            if frame.locator(f"input[value*='{actual_site_job_card}']").count() > 0:
+                                is_active_job = True
+                            else:
+                                # Check 2: Main form/card container ka text padho (Sidebar ko ignore karne ke liye)
+                                form_container = frame.locator("input#num_scrap_weight").first.locator("xpath=ancestor::form | ancestor::div[contains(@class, 'card')] | ancestor::main").first
+                                if form_container.count() > 0:
+                                    if actual_site_job_card in form_container.inner_text().upper():
+                                        is_active_job = True
+                                else:
+                                    # Check 3: Agar Job Card number ke aas-paas "JOB" ya "CARD" likha hai (e.g. Job Card No: 1233)
+                                    for line in text.split('\n'):
+                                        if actual_site_job_card in line and ("JOB" in line or "CARD" in line or "NO" in line):
+                                            is_active_job = True
+                                            break
+                            
+                            # Agar ye confirm ho gaya ki ye active job hai, tabhi LOT check karega
+                            if is_active_job:
                                 if expected_lot_string in text:
                                     bis_page = frame
-                                    break
+                                    break  # ✅ Sahi tab mil gaya!
                                 else:
                                     wrong_lot_error = True
                     except: pass
