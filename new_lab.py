@@ -51,12 +51,16 @@ def generate_pro_lab_data(selected_jobs, purity_val, low_r, high_r, c1m2, c2m2):
         cursor = conn.cursor()
         
         for jc in selected_jobs:
-            # 🚀 Formula Calculations
-            m1c1_base = c1m2 / 0.9997
-            m1c2_base = c2m2 / 0.9999
+            # 🚀 Formula Calculations (Divide system khtam, user logic applied)
+            rand_delta_1 = random.uniform(0.010, 0.100)
+            rand_delta_2 = random.uniform(0.010, 0.100)
+
+            # M1 ki value banegi = User ka M2 + Random Value
+            m1c1 = round(c1m2 + rand_delta_1, 3)
+            m1c2 = round(c2m2 + rand_delta_2, 3)
             
-            m1s1 = round((m1c1_base / p_val) + random.uniform(-0.5, 0.5), 3)
-            m1s2 = round((m1c2_base / p_val) + random.uniform(-0.5, 0.5), 3)
+            m1s1 = round((m1c1 / p_val) + random.uniform(-0.5, 0.5), 3)
+            m1s2 = round((m1c2 / p_val) + random.uniform(-0.5, 0.5), 3)
             
             r1 = random.uniform(low_r, high_r) / 1000.0
             r2 = random.uniform(low_r, high_r) / 1000.0
@@ -71,10 +75,9 @@ def generate_pro_lab_data(selected_jobs, purity_val, low_r, high_r, c1m2, c2m2):
             c1_ag = ag_s1
             c2_ag = ag_s1
             
-            m1c1 = round(m1c1_base + random.uniform(-0.1, 0.1), 3)
-            m1c2 = round(m1c2_base + random.uniform(-0.1, 0.1), 3)
-            c1m2_final = round(m1c1 * 0.9997, 3)
-            c2m2_final = round(m1c2 * 0.9999, 3)
+            # 🚀 M2 ki value exact wahi rahegi jo User ne UI se daali hai
+            c1m2_final = round(c1m2, 3)
+            c2m2_final = round(c2m2, 3)
 
             # 🚀 FIX 2: Copper (Cu) calculation
             calculated_cu = round(abs(m1s1 - m1c1))
@@ -153,28 +156,28 @@ def inject_lab_weight_ghost(lab_data=None):
                         if frame.locator("input#num_scrap_weight").count() > 0 or frame.locator("input#buttonweight").count() > 0:
                             text = frame.locator("body").inner_text().upper()
                             
-                            # 🚀 BUG FIX: Sidebar bypass logic (Strict Job Card Verification)
+                            # 🚀 BUG FIX: "Photo Wali Jagah" se Perfect Match (Sidebar Bypass)
                             is_active_job = False
                             
-                            # Check 1: Agar Job Card kisi Input Box ki value hai (Most Reliable in BIS)
-                            if frame.locator(f"input[value*='{actual_site_job_card}']").count() > 0:
+                            # Text ko clean karke label aur value ko ek sath jodd do
+                            # Jaise: "Job Card Number : 100166838" ban jayega "JOBCARDNUMBER100166838"
+                            clean_text = text.replace(" ", "").replace("\n", "").replace("\r", "").replace(":", "")
+                            
+                            perfect_match_1 = f"JOBCARDNUMBER{actual_site_job_card}"
+                            perfect_match_2 = f"JOBCARDNO{actual_site_job_card}"
+                            
+                            # Sidebar me sirf number hota hai, label nahi! 
+                            # Isliye ye condition SIRF tabhi TRUE hogi jab "Photo wali jagah" par job card hoga!
+                            if perfect_match_1 in clean_text or perfect_match_2 in clean_text:
                                 is_active_job = True
                             else:
-                                # Check 2: Main form/card container ka text padho (Sidebar ko ignore karne ke liye)
-                                form_container = frame.locator("input#num_scrap_weight").first.locator("xpath=ancestor::form | ancestor::div[contains(@class, 'card')] | ancestor::main").first
-                                if form_container.count() > 0:
-                                    if actual_site_job_card in form_container.inner_text().upper():
-                                        is_active_job = True
-                                else:
-                                    # Check 3: Agar Job Card number ke aas-paas "JOB" ya "CARD" likha hai (e.g. Job Card No: 1233)
-                                    for line in text.split('\n'):
-                                        if actual_site_job_card in line and ("JOB" in line or "CARD" in line or "NO" in line):
-                                            is_active_job = True
-                                            break
+                                # Safety Fallback: Agar job card seedha kisi Input box ke andar ho
+                                if frame.locator(f"input[value='{actual_site_job_card}']").count() > 0:
+                                    is_active_job = True
                             
-                            # Agar ye confirm ho gaya ki ye active job hai, tabhi LOT check karega
+                            # Jab 100% PERFECT MATCH hoga, tabhi LOT check karega!
                             if is_active_job:
-                                if expected_lot_string in text:
+                                if expected_lot_string in text or expected_lot_string.replace(" ", "") in clean_text:
                                     bis_page = frame
                                     break  # ✅ Sahi tab mil gaya!
                                 else:
