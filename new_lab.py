@@ -82,7 +82,6 @@ def generate_pro_lab_data(selected_jobs, purity_val, low_r, high_r, c1m2, c2m2):
             # 🚀 FIX 2: Copper (Cu) calculation
             calculated_cu = round(abs(m1s1 - m1c1))
 
-            # 🚀 FIX 3: Lead Calculation
             # 🚀 FIX 3: Lead Calculation (<=250: 4g, 251-500: 6g, >500: 8g)
             if m1s1 > 500 or m1s2 > 500:
                 lead_val = 8
@@ -114,7 +113,7 @@ def generate_pro_lab_data(selected_jobs, purity_val, low_r, high_r, c1m2, c2m2):
         return {"status": "error", "msg": f"Database Error: {str(e)}"}
 
 # ==============================================================
-# 🚀 3. LAB INJECTION (Pure Bot Engine - No Cheat Codes)
+# 🚀 3. LAB INJECTION (Original Superfast JS Engine)
 # ==============================================================
 def inject_lab_weight_ghost(lab_data=None):
     if lab_data is None or len(lab_data) == 0:
@@ -148,7 +147,7 @@ def inject_lab_weight_ghost(lab_data=None):
             wrong_lot_error = False
             time.sleep(1) # Tab load hone ka wait
             
-            # 🚀 SMART STRICT MATCHING: Ulta loop (Naya tab pehle check karega)
+            # 🚀 SMART STRICT MATCHING WITH LOT AUTO-SWITCHER
             for page in browser.contexts[0].pages[::-1]:
                 for frame in [page] + page.frames:
                     try:
@@ -158,25 +157,45 @@ def inject_lab_weight_ghost(lab_data=None):
                             
                             # 🚀 BUG FIX: "Photo Wali Jagah" se Perfect Match (Sidebar Bypass)
                             is_active_job = False
-                            
-                            # Text ko clean karke label aur value ko ek sath jodd do
-                            # Jaise: "Job Card Number : 100166838" ban jayega "JOBCARDNUMBER100166838"
                             clean_text = text.replace(" ", "").replace("\n", "").replace("\r", "").replace(":", "")
                             
                             perfect_match_1 = f"JOBCARDNUMBER{actual_site_job_card}"
                             perfect_match_2 = f"JOBCARDNO{actual_site_job_card}"
                             
-                            # Sidebar me sirf number hota hai, label nahi! 
-                            # Isliye ye condition SIRF tabhi TRUE hogi jab "Photo wali jagah" par job card hoga!
                             if perfect_match_1 in clean_text or perfect_match_2 in clean_text:
                                 is_active_job = True
                             else:
-                                # Safety Fallback: Agar job card seedha kisi Input box ke andar ho
+                                # Safety Fallback
                                 if frame.locator(f"input[value='{actual_site_job_card}']").count() > 0:
                                     is_active_job = True
                             
                             # Jab 100% PERFECT MATCH hoga, tabhi LOT check karega!
                             if is_active_job:
+                                # 🔄 SMART AUTO-LOT SELECTOR
+                                if target_lot_num != "1":
+                                    if expected_lot_string not in text and expected_lot_string.replace(" ", "") not in clean_text:
+                                        try:
+                                            print(f"🔄 Auto-switching to Lot {target_lot_num}...")
+                                            lot_dropdown = frame.locator("span[class*='select2-selection']").first
+                                            if lot_dropdown.count() > 0:
+                                                lot_dropdown.click()
+                                                frame.wait_for_timeout(500)
+                                                option = frame.locator(f"li.select2-results__option:has-text('Lot {target_lot_num}')").first
+                                                if option.count() > 0:
+                                                    option.click()
+                                                    frame.wait_for_timeout(2000)
+                                            else:
+                                                select_el = frame.locator("select").filter(has_text=f"Lot {target_lot_num}").first
+                                                if select_el.count() > 0:
+                                                    select_el.select_option(label=f"Lot {target_lot_num}")
+                                                    frame.wait_for_timeout(2000)
+                                            
+                                            # Refresh values after switch
+                                            text = frame.locator("body").inner_text().upper()
+                                            clean_text = text.replace(" ", "").replace("\n", "").replace("\r", "").replace(":", "")
+                                        except Exception as e:
+                                            print(f"⚠️ Lot Dropdown Switch Error: {e}")
+
                                 if expected_lot_string in text or expected_lot_string.replace(" ", "") in clean_text:
                                     bis_page = frame
                                     break  # ✅ Sahi tab mil gaya!
@@ -189,7 +208,6 @@ def inject_lab_weight_ghost(lab_data=None):
                 try: browser.disconnect() 
                 except: pass
                 
-                # 🚀 SMART ERROR: User ko exactly batao ki usne Lot me galti ki hai
                 if wrong_lot_error:
                     return f"❌ अलर्ट: जॉब कार्ड '{actual_site_job_card}' मिल गया, लेकिन साइट पर '{expected_lot_string}' खुला नहीं है! कृपया सही Lot चुनें।"
                 return f"❌ अलर्ट: Job Card '{actual_site_job_card}' का लैब फॉर्म स्क्रीन पर नहीं मिला!"
@@ -203,33 +221,31 @@ def inject_lab_weight_ghost(lab_data=None):
             # 🚀 ULTRA-PRECISE PRE-INJECTION SEQUENCE (Master Weights)
             # ---------------------------------------------------------
             try:
-                # 1. SAMPLE DRAWN WEIGHT
+                # 1. SAMPLE DRAWN WEIGHT (Original JS Fix)
                 if sample_wt and str(sample_wt) not in ["0", "0.0", "", "None"]:
                     print(f"⚖️ Injecting Sample Drawn Weight: {sample_wt}")
                     sample_input = bis_page.locator("input#num_scrap_weight").first
                     
                     if sample_input.count() > 0:
-                        # 🚨 BYPASS FOCUS STEALING: Direct JS Value Injection
-                        # 🚀 ANTI-BOT FIX: Human Typing Simulator
-                        js_unlock = "node => { node.removeAttribute('disabled'); node.removeAttribute('readonly'); }"
-                        sample_input.evaluate(js_unlock) # (Button wale me button_input likhein)
+                        js_fill = f"""node => {{
+                            node.removeAttribute('disabled'); 
+                            node.removeAttribute('readonly');
+                            node.value = '{sample_wt}';
+                            node.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                            node.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                        }}"""
+                        sample_input.evaluate(js_fill)
+                        bis_page.wait_for_timeout(800)
                         
-                        sample_input.focus()
-                        sample_input.fill("")
-                        sample_input.type(str(sample_wt), delay=65) # (Button wale me button_wt likhein)
-                        sample_input.press("Tab")
-                        bis_page.wait_for_timeout(300)
-                        
-                        # Uske turant baad wala Save button dabe ga
                         sample_save_btn = bis_page.locator("xpath=//input[@id='num_scrap_weight']/following::button[contains(., 'Save')][1]").first
                         if sample_save_btn.count() > 0:
                             sample_save_btn.evaluate("node => node.click()")
                             print("✅ Sample Drawn Weight Saved Successfully!")
-                            bis_page.wait_for_timeout(2500) # Server AJAX request ko process karne dega
+                            bis_page.wait_for_timeout(2500)
                         else:
                             print("⚠️ Sample Weight ka Save button nahi mila!")
 
-                # 2. BUTTON WEIGHT
+                # 2. BUTTON WEIGHT (Original JS Fix)
                 if button_wt and str(button_wt) not in ["0", "0.0", "", "None"]:
                     print(f"⚖️ Injecting Button Weight: {button_wt}")
                     
@@ -238,15 +254,15 @@ def inject_lab_weight_ghost(lab_data=None):
                         button_input = bis_page.locator("xpath=//label[contains(., 'Button Weight')]/following::input[1]").first
                     
                     if button_input.count() > 0:
-                        # 🚀 ANTI-BOT FIX: Human Typing Simulator
-                        js_unlock = "node => { node.removeAttribute('disabled'); node.removeAttribute('readonly'); }"
-                        button_input.evaluate(js_unlock) 
-                        
-                        button_input.focus()
-                        button_input.fill("")
-                        button_input.type(str(button_wt), delay=65) 
-                        button_input.press("Tab")
-                        bis_page.wait_for_timeout(300)
+                        js_fill = f"""node => {{
+                            node.removeAttribute('disabled'); 
+                            node.removeAttribute('readonly');
+                            node.value = '{button_wt}';
+                            node.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                            node.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                        }}"""
+                        button_input.evaluate(js_fill)
+                        bis_page.wait_for_timeout(700)
                         
                         button_save_btn = bis_page.locator("xpath=//input[@id='buttonweight']/following::button[contains(., 'Save')][1]").first
                         if button_save_btn.count() == 0:
@@ -255,7 +271,7 @@ def inject_lab_weight_ghost(lab_data=None):
                         if button_save_btn.count() > 0:
                             button_save_btn.evaluate("node => node.click()")
                             print("✅ Button Weight Saved Successfully!")
-                            bis_page.wait_for_timeout(2500) # Wait for Server AJAX
+                            bis_page.wait_for_timeout(2500)
                         else:
                             print("⚠️ Button Weight ka Save button nahi mila!")
 
@@ -286,15 +302,15 @@ def inject_lab_weight_ghost(lab_data=None):
                                 box = inputs.nth(idx)
                                 val_str = str(val).strip()
                                 if str(box.evaluate("node => node.value")).strip() != val_str:
-                                    # 🚀 FIX: Key-by-key typing hata di hai, direct JS injection se 100% accuracy aayegi chahe net slow ho
-                                    # 🚀 ANTI-BOT FIX: Human Typing Simulator
-                                    js_unlock = "node => { node.removeAttribute('disabled'); node.removeAttribute('readonly'); }"
-                                    box.evaluate(js_unlock)
-                                    
-                                    box.focus()
-                                    box.fill("")
-                                    box.type(str(val_str), delay=55) # Insaan ki tarah typing
-                                    box.press("Tab")
+                                    # 🚀 ORIGINAL JS INJECTOR RESTORED (Superfast paste)
+                                    js_fill = f"""node => {{
+                                        node.removeAttribute('disabled'); 
+                                        node.removeAttribute('readonly');
+                                        node.value = '{val_str}';
+                                        node.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                                        node.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                                    }}"""
+                                    box.evaluate(js_fill)
                                     bis_page.wait_for_timeout(random.randint(100, 300))
                                     return True
                             return False

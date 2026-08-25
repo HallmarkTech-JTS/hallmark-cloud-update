@@ -121,16 +121,16 @@ def inject_single_reception_tag(job_id, tag_id, weight):
                 
                 if weight_input.count() > 0:
                     # 🚀 ANTI-BOT FIX: Human Typing Simulator
-                                js_unlock = """node => {
+                                js_inject = f"""node => {{
                                     node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
                                     node.removeAttribute('onpaste'); node.removeAttribute('oncopy'); 
-                                }"""
-                                weight_input.evaluate(js_unlock)
-                                
-                                weight_input.focus()
-                                weight_input.fill("") # Pehle box khali karega
-                                weight_input.type(str(weight), delay=65) # Insaan ki tarah 65ms ruk-ruk kar type karega
-                                weight_input.press("Tab") # Type karne ke baad Tab dabayega
+                                    node.removeAttribute('oncut'); node.removeAttribute('oncontextmenu'); 
+                                    node.value = '{weight}'; 
+                                    node.dispatchEvent(new Event('input', {{ bubbles: true }})); 
+                                    node.dispatchEvent(new Event('change', {{ bubbles: true }})); 
+                                    node.dispatchEvent(new Event('blur', {{ bubbles: true }})); 
+                                }}"""
+                                weight_input.evaluate(js_inject)
                     
                     save_btn = target_row.locator("text='Save'").first
                     if save_btn.is_visible():
@@ -193,16 +193,16 @@ def fast_inject_weight(job_id, tag_id, weight):
                 weight_input = row.first.locator("input.weightCls, input.scan-input, input[name='articlWeight'], input:not([type='hidden']):not([type='checkbox'])").first
                 if weight_input.count() > 0:
                     # 🚀 ANTI-BOT FIX: Human Typing Simulator
-                                js_unlock = """node => {
+                                js_inject = f"""node => {{
                                     node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
                                     node.removeAttribute('onpaste'); node.removeAttribute('oncopy'); 
-                                }"""
-                                weight_input.evaluate(js_unlock)
-                                
-                                weight_input.focus()
-                                weight_input.fill("") # Pehle box khali karega
-                                weight_input.type(str(weight), delay=65) # Insaan ki tarah 65ms ruk-ruk kar type karega
-                                weight_input.press("Tab") # Type karne ke baad Tab dabayega
+                                    node.removeAttribute('oncut'); node.removeAttribute('oncontextmenu'); 
+                                    node.value = '{weight}'; 
+                                    node.dispatchEvent(new Event('input', {{ bubbles: true }})); 
+                                    node.dispatchEvent(new Event('change', {{ bubbles: true }})); 
+                                    node.dispatchEvent(new Event('blur', {{ bubbles: true }})); 
+                                }}"""
+                                weight_input.evaluate(js_inject)
                     
                     save_btn = row.first.locator("text='Save'").first
                     if save_btn.is_visible():
@@ -291,16 +291,16 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
                             if weight_input.count() > 0:
                                 # 1. वज़न इंजेक्ट करें
                                 # 🚀 ANTI-BOT FIX: Human Typing Simulator
-                                js_unlock = """node => {
+                                js_inject = f"""node => {{
                                     node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
                                     node.removeAttribute('onpaste'); node.removeAttribute('oncopy'); 
-                                }"""
-                                weight_input.evaluate(js_unlock)
-                                
-                                weight_input.focus()
-                                weight_input.fill("") # Pehle box khali karega
-                                weight_input.type(str(weight), delay=65) # Insaan ki tarah 65ms ruk-ruk kar type karega
-                                weight_input.press("Tab") # Type karne ke baad Tab dabayega
+                                    node.removeAttribute('oncut'); node.removeAttribute('oncontextmenu'); 
+                                    node.value = '{weight}'; 
+                                    node.dispatchEvent(new Event('input', {{ bubbles: true }})); 
+                                    node.dispatchEvent(new Event('change', {{ bubbles: true }})); 
+                                    node.dispatchEvent(new Event('blur', {{ bubbles: true }})); 
+                                }}"""
+                                weight_input.evaluate(js_inject)
                                 
                                 # 2. 🚀 STRICT POPUP & SAVE LOGIC (Slow PC / Internet Proof)
                                 main_page = target_frame.page if hasattr(target_frame, 'page') else target_frame
