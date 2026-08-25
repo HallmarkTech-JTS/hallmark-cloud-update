@@ -120,16 +120,17 @@ def inject_single_reception_tag(job_id, tag_id, weight):
                 weight_input = target_row.locator("input.weightCls, input.scan-input, input[name='articlWeight'], input:not([type='hidden']):not([type='checkbox'])").first
                 
                 if weight_input.count() > 0:
-                    js_inject = f"""node => {{
-                        node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
-                        node.removeAttribute('onpaste'); node.removeAttribute('oncopy'); 
-                        node.removeAttribute('oncut'); node.removeAttribute('oncontextmenu'); 
-                        node.value = '{weight}'; 
-                        node.dispatchEvent(new Event('input', {{ bubbles: true }})); 
-                        node.dispatchEvent(new Event('change', {{ bubbles: true }})); 
-                        node.dispatchEvent(new Event('blur', {{ bubbles: true }})); 
-                    }}"""
-                    weight_input.evaluate(js_inject)
+                    # 🚀 ANTI-BOT FIX: Human Typing Simulator
+                                js_unlock = """node => {
+                                    node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
+                                    node.removeAttribute('onpaste'); node.removeAttribute('oncopy'); 
+                                }"""
+                                weight_input.evaluate(js_unlock)
+                                
+                                weight_input.focus()
+                                weight_input.fill("") # Pehle box khali karega
+                                weight_input.type(str(weight), delay=65) # Insaan ki tarah 65ms ruk-ruk kar type karega
+                                weight_input.press("Tab") # Type karne ke baad Tab dabayega
                     
                     save_btn = target_row.locator("text='Save'").first
                     if save_btn.is_visible():
@@ -191,16 +192,17 @@ def fast_inject_weight(job_id, tag_id, weight):
             if row.count() > 0:
                 weight_input = row.first.locator("input.weightCls, input.scan-input, input[name='articlWeight'], input:not([type='hidden']):not([type='checkbox'])").first
                 if weight_input.count() > 0:
-                    js_inject = f"""node => {{
-                        node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
-                        node.removeAttribute('onpaste'); node.removeAttribute('oncopy'); 
-                        node.removeAttribute('oncut'); node.removeAttribute('oncontextmenu'); 
-                        node.value = '{weight}'; 
-                        node.dispatchEvent(new Event('input', {{ bubbles: true }})); 
-                        node.dispatchEvent(new Event('change', {{ bubbles: true }})); 
-                        node.dispatchEvent(new Event('blur', {{ bubbles: true }})); 
-                    }}"""
-                    weight_input.evaluate(js_inject)
+                    # 🚀 ANTI-BOT FIX: Human Typing Simulator
+                                js_unlock = """node => {
+                                    node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
+                                    node.removeAttribute('onpaste'); node.removeAttribute('oncopy'); 
+                                }"""
+                                weight_input.evaluate(js_unlock)
+                                
+                                weight_input.focus()
+                                weight_input.fill("") # Pehle box khali karega
+                                weight_input.type(str(weight), delay=65) # Insaan ki tarah 65ms ruk-ruk kar type karega
+                                weight_input.press("Tab") # Type karne ke baad Tab dabayega
                     
                     save_btn = row.first.locator("text='Save'").first
                     if save_btn.is_visible():
@@ -288,34 +290,65 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
                             
                             if weight_input.count() > 0:
                                 # 1. वज़न इंजेक्ट करें
-                                js_inject = f"""node => {{
+                                # 🚀 ANTI-BOT FIX: Human Typing Simulator
+                                js_unlock = """node => {
                                     node.removeAttribute('disabled'); node.removeAttribute('readonly'); 
-                                    node.value = '{weight}'; 
-                                    node.dispatchEvent(new Event('input', {{ bubbles: true }})); 
-                                    node.dispatchEvent(new Event('change', {{ bubbles: true }})); 
-                                    node.dispatchEvent(new Event('blur', {{ bubbles: true }})); 
-                                }}"""
-                                weight_input.evaluate(js_inject)
+                                    node.removeAttribute('onpaste'); node.removeAttribute('oncopy'); 
+                                }"""
+                                weight_input.evaluate(js_unlock)
                                 
-                                # 2. 🚀 STRICT POPUP & SAVE LOGIC (Auto-OK Without Freeze)
+                                weight_input.focus()
+                                weight_input.fill("") # Pehle box khali karega
+                                weight_input.type(str(weight), delay=65) # Insaan ki tarah 65ms ruk-ruk kar type karega
+                                weight_input.press("Tab") # Type karne ke baad Tab dabayega
+                                
+                                # 2. 🚀 STRICT POPUP & SAVE LOGIC (Slow PC / Internet Proof)
                                 main_page = target_frame.page if hasattr(target_frame, 'page') else target_frame
                                 save_btn = row.locator(".saveWeight, .btn-primary, button:has-text('Save')").first
                                 
                                 if save_btn.count() > 0:
-                                    # 🚀 FIX 1: Event Listener jo Popup aate hi AUTO-OK (Accept) dabayega
+                                    # 🚀 Popup (OK) ko handle karne ke liye
                                     try: main_page.once("dialog", lambda dialog: dialog.accept())
                                     except: pass
                                     
-                                    # 🚀 FIX 2: Smart Async Click (Isse code OK button par hang nahi hoga)
-                                    # setTimeout(..., 50) ka matlab hai 50ms ke baad click hoga, taaki python script aage badh sake
+                                    # 🚀 Async Click (Bina freeze hue background me click karega)
                                     save_btn.evaluate("node => setTimeout(() => node.click(), 50)")
                                     
-                                    # 🚀 FIX 3: Click aur OK hone ka halka sa wait taaki Processing start ho sake
-                                    time.sleep(0.8)
-                                    
-                                    # 3. प्रोसेसिंग का स्ट्रिक्ट वेट (Strict Wait)
+                                    # ==============================================================
+                                    # 🚀 BULLETPROOF 2-PHASE RADAR (Slow Internet ke liye)
+                                    # ==============================================================
                                     start_wait = time.time()
-                                    while time.time() - start_wait < 5.0: # 5 seconds max safety
+                                    processing_started = False
+                                    
+                                    # Phase 1: Wait for "PROCESSING" to APPEAR (Up to 4 seconds ka wait)
+                                    while time.time() - start_wait < 4.0:
+                                        try:
+                                            is_processing = target_frame.evaluate("""() => {
+                                                return document.body.innerText.replace(/\\s/g, '').toUpperCase().includes('PROCESSING');
+                                            }""")
+                                            if is_processing:
+                                                processing_started = True
+                                                break # Jaise hi processing aayi, Phase 1 khatam!
+                                        except: pass
+                                        time.sleep(0.2) # Halki saans lega taaki CPU par load na pade
+                                        
+                                    # Phase 2: Wait for "PROCESSING" to DISAPPEAR (Up to 15 seconds)
+                                    if processing_started:
+                                        phase2_start = time.time()
+                                        while time.time() - phase2_start < 15.0:
+                                            try:
+                                                is_still_processing = target_frame.evaluate("""() => {
+                                                    return document.body.innerText.replace(/\\s/g, '').toUpperCase().includes('PROCESSING');
+                                                }""")
+                                                if not is_still_processing:
+                                                    break # Processing khatam ho gayi, Loop tod do!
+                                            except:
+                                                # Agar website refresh ho gayi (Frame ud gaya), to exception aayega
+                                                break # Matlab kam ho gaya, Loop tod do!
+                                            time.sleep(0.3)
+                                    else:
+                                        # Backup Safety: Agar kisi wajah se 'Processing' likha hi na aaye, to 1 sec ruko
+                                        time.sleep(1.0)
                                         try:
                                             is_processing = target_frame.evaluate("""() => {
                                                 let text = document.body.innerText.replace(/\\s/g, '').toUpperCase();

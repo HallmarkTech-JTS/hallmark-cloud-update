@@ -210,14 +210,14 @@ def inject_lab_weight_ghost(lab_data=None):
                     
                     if sample_input.count() > 0:
                         # 🚨 BYPASS FOCUS STEALING: Direct JS Value Injection
-                        js_fill = f"""node => {{
-                            node.removeAttribute('disabled'); 
-                            node.removeAttribute('readonly');
-                            node.value = '{sample_wt}';
-                            node.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                            node.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                        }}"""
-                        sample_input.evaluate(js_fill)
+                        # 🚀 ANTI-BOT FIX: Human Typing Simulator
+                        js_unlock = "node => { node.removeAttribute('disabled'); node.removeAttribute('readonly'); }"
+                        sample_input.evaluate(js_unlock) # (Button wale me button_input likhein)
+                        
+                        sample_input.focus()
+                        sample_input.fill("")
+                        sample_input.type(str(sample_wt), delay=65) # (Button wale me button_wt likhein)
+                        sample_input.press("Tab")
                         bis_page.wait_for_timeout(300)
                         
                         # Uske turant baad wala Save button dabe ga
@@ -238,15 +238,14 @@ def inject_lab_weight_ghost(lab_data=None):
                         button_input = bis_page.locator("xpath=//label[contains(., 'Button Weight')]/following::input[1]").first
                     
                     if button_input.count() > 0:
-                        # 🚨 BYPASS FOCUS STEALING: Direct JS Value Injection
-                        js_fill = f"""node => {{
-                            node.removeAttribute('disabled'); 
-                            node.removeAttribute('readonly');
-                            node.value = '{button_wt}';
-                            node.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                            node.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                        }}"""
-                        button_input.evaluate(js_fill)
+                        # 🚀 ANTI-BOT FIX: Human Typing Simulator
+                        js_unlock = "node => { node.removeAttribute('disabled'); node.removeAttribute('readonly'); }"
+                        button_input.evaluate(js_unlock) 
+                        
+                        button_input.focus()
+                        button_input.fill("")
+                        button_input.type(str(button_wt), delay=65) 
+                        button_input.press("Tab")
                         bis_page.wait_for_timeout(300)
                         
                         button_save_btn = bis_page.locator("xpath=//input[@id='buttonweight']/following::button[contains(., 'Save')][1]").first
@@ -288,14 +287,14 @@ def inject_lab_weight_ghost(lab_data=None):
                                 val_str = str(val).strip()
                                 if str(box.evaluate("node => node.value")).strip() != val_str:
                                     # 🚀 FIX: Key-by-key typing hata di hai, direct JS injection se 100% accuracy aayegi chahe net slow ho
-                                    js_fill = f"""node => {{
-                                        node.removeAttribute('disabled'); 
-                                        node.removeAttribute('readonly');
-                                        node.value = '{val_str}';
-                                        node.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                                        node.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                                    }}"""
-                                    box.evaluate(js_fill)
+                                    # 🚀 ANTI-BOT FIX: Human Typing Simulator
+                                    js_unlock = "node => { node.removeAttribute('disabled'); node.removeAttribute('readonly'); }"
+                                    box.evaluate(js_unlock)
+                                    
+                                    box.focus()
+                                    box.fill("")
+                                    box.type(str(val_str), delay=55) # Insaan ki tarah typing
+                                    box.press("Tab")
                                     bis_page.wait_for_timeout(random.randint(100, 300))
                                     return True
                             return False
