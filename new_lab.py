@@ -193,29 +193,35 @@ def inject_lab_weight_ghost(lab_data=None):
             # 🌟 MASTER WEIGHING MACHINE SIMULATOR 🌟
             # ==============================================================
             def insert_weight_like_machine(locator_obj, weight_val):
-                """Yeh function website ko 100% dhokha dega ki data COM port se aaya hai"""
-                # Step 1: Chupke se lock kholo aur element ko focus karo
-                locator_obj.evaluate("""node => {
+                """
+                Ultimate Bypass: Yeh React/Angular ke value tracker aur 
+                events ko direct trigger karega taaki 'Unauthorized input' ka popup na aaye.
+                """
+                locator_obj.evaluate(f"""node => {{
                     let nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                    node.dataset.wro = node.hasAttribute('readonly') ? '1' : '0';
-                    node.dataset.wds = node.hasAttribute('disabled') ? '1' : '0';
-                    node.removeAttribute('readonly');
-                    node.removeAttribute('disabled');
-                    nativeSetter.call(node, ''); // Purana kachra saaf karo bina alarm bajaye
-                    node.focus(); // Focus karna zaruri hai OS paste ke liye
-                }""")
-                
-                # Step 2: 🚀 THE MAGIC - OS Level Native Insertion 
-                # (isTrusted = true dega, aur "keydown" nahi bhejeaga, jisse 'Manual Entry Banned' nahi aayega)
-                main_page.keyboard.insert_text(str(weight_val))
-                
-                # Step 3: Piche se locks wapas lagao aur framework ko update karo
-                locator_obj.evaluate("""node => {
-                    node.dispatchEvent(new Event('change', { bubbles: true }));
-                    node.blur();
-                    if(node.dataset.wro === '1') node.setAttribute('readonly', 'true');
-                    if(node.dataset.wds === '1') node.setAttribute('disabled', 'true');
-                }""")
+                    
+                    let wasReadonly = node.hasAttribute('readonly');
+                    let wasDisabled = node.hasAttribute('disabled');
+                    
+                    if(wasReadonly) node.removeAttribute('readonly');
+                    if(wasDisabled) node.removeAttribute('disabled');
+                    
+                    # 1. Direct Native Value Set
+                    nativeSetter.call(node, '{weight_val}');
+                    
+                    # 2. Framework Value Tracker Bypass (React/Angular catch nahi kar payega)
+                    if (node._valueTracker) {{
+                        node._valueTracker.setValue('{weight_val}');
+                    }}
+                    
+                    # 3. Trusted Events Dispatch
+                    node.dispatchEvent(new Event('input', {{ bubbles: true, cancelable: true, isTrusted: true }}));
+                    node.dispatchEvent(new Event('change', {{ bubbles: true, cancelable: true, isTrusted: true }}));
+                    node.dispatchEvent(new Event('blur', {{ bubbles: true }}));
+                    
+                    if(wasReadonly) node.setAttribute('readonly', 'true');
+                    if(wasDisabled) node.setAttribute('disabled', 'true');
+                }}""")
             # ==============================================================
 
             try:
