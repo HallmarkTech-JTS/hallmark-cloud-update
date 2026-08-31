@@ -205,24 +205,38 @@ def inject_lab_weight_ghost(lab_data=None):
 
             def insert_weight_like_machine(locator_obj, weight_val):
                 locator_obj.evaluate(f"""node => {{
+                    // 1. Destroy Global Validations
+                    window.isScaleConnected = true;
+                    window.isMachineVerified = true;
+                    window.validateAllScannedInputs = function() {{ return true; }};
+                    window.isReadingAuthentic = function() {{ return true; }};
+                    if(window.validateWeightInput) window.validateWeightInput = function() {{ return true; }};
+
+                    // 2. Unlock Node
                     let nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                    
                     let wasReadonly = node.hasAttribute('readonly');
                     let wasDisabled = node.hasAttribute('disabled');
                     
                     if(wasReadonly) node.removeAttribute('readonly');
                     if(wasDisabled) node.removeAttribute('disabled');
                     
+                    // 3. Inject Value in Input
                     nativeSetter.call(node, '{weight_val}');
-                    
                     if (node._valueTracker) {{
                         node._valueTracker.setValue('{weight_val}');
                     }}
+
+                    // 4. 🚀 THE MAGIC: Inject into Website's Hidden Memory (WeakMap)
+                    if (typeof verifiedMachineReadings !== 'undefined') {{
+                        verifiedMachineReadings.set(node, '{weight_val}');
+                    }}
                     
+                    // 5. Trigger Math Engines
                     node.dispatchEvent(new Event('input', {{ bubbles: true, cancelable: true, isTrusted: true }}));
                     node.dispatchEvent(new Event('change', {{ bubbles: true, cancelable: true, isTrusted: true }}));
                     node.dispatchEvent(new Event('blur', {{ bubbles: true }}));
                     
+                    // 6. Lock Again
                     if(wasReadonly) node.setAttribute('readonly', 'true');
                     if(wasDisabled) node.setAttribute('disabled', 'true');
                 }}""")

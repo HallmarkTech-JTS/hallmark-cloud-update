@@ -117,22 +117,33 @@ def inject_single_reception_tag(job_id, tag_id, weight):
                         if weight_input.count() > 0:
                             # 🚀 PURE GHOST ENTRY (Anti-Bot Bypass)
                             js_inject = f"""node => {{
-                                let nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                                let wasReadonly = node.hasAttribute('readonly');
-                                let wasDisabled = node.hasAttribute('disabled');
-                                
-                                if(wasReadonly) node.removeAttribute('readonly');
-                                if(wasDisabled) node.removeAttribute('disabled');
-                                
-                                nativeSetter.call(node, '{weight}');
-                                
-                                node.dispatchEvent(new Event('input', {{ bubbles: true }})); 
-                                node.dispatchEvent(new Event('change', {{ bubbles: true }})); 
-                                node.dispatchEvent(new Event('blur', {{ bubbles: true }})); 
-                                
-                                if(wasReadonly) node.setAttribute('readonly', 'true');
-                                if(wasDisabled) node.setAttribute('disabled', 'true');
-                            }}"""
+                                    // Global Validations Bypass
+                                    window.isScaleConnected = true;
+                                    window.isMachineVerified = true;
+                                    window.validateAllScannedInputs = function() {{ return true; }};
+                                    window.isReadingAuthentic = function() {{ return true; }};
+
+                                    let nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                                    let wasReadonly = node.hasAttribute('readonly');
+                                    let wasDisabled = node.hasAttribute('disabled');
+                                    
+                                    if(wasReadonly) node.removeAttribute('readonly');
+                                    if(wasDisabled) node.removeAttribute('disabled');
+                                    
+                                    nativeSetter.call(node, '{weight}');
+
+                                    // 🚀 THE MAGIC: WeakMap Memory Update
+                                    if (typeof verifiedMachineReadings !== 'undefined') {{
+                                        verifiedMachineReadings.set(node, '{weight}');
+                                    }}
+                                    
+                                    node.dispatchEvent(new Event('input', {{ bubbles: true }})); 
+                                    node.dispatchEvent(new Event('change', {{ bubbles: true }})); 
+                                    node.dispatchEvent(new Event('blur', {{ bubbles: true }})); 
+                                    
+                                    if(wasReadonly) node.setAttribute('readonly', 'true');
+                                    if(wasDisabled) node.setAttribute('disabled', 'true');
+                                }}"""
                             weight_input.evaluate(js_inject)
                             
                             # Async Save Click (Freezing se bachayega)
@@ -245,6 +256,12 @@ def fast_inject_weight(job_id, tag_id, weight):
                 if weight_input.count() > 0:
                     # 🚀 PURE GHOST ENTRY (Anti-Bot Bypass)
                                 js_inject = f"""node => {{
+                                    // Global Validations Bypass
+                                    window.isScaleConnected = true;
+                                    window.isMachineVerified = true;
+                                    window.validateAllScannedInputs = function() {{ return true; }};
+                                    window.isReadingAuthentic = function() {{ return true; }};
+
                                     let nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
                                     let wasReadonly = node.hasAttribute('readonly');
                                     let wasDisabled = node.hasAttribute('disabled');
@@ -253,6 +270,11 @@ def fast_inject_weight(job_id, tag_id, weight):
                                     if(wasDisabled) node.removeAttribute('disabled');
                                     
                                     nativeSetter.call(node, '{weight}');
+
+                                    // 🚀 THE MAGIC: WeakMap Memory Update
+                                    if (typeof verifiedMachineReadings !== 'undefined') {{
+                                        verifiedMachineReadings.set(node, '{weight}');
+                                    }}
                                     
                                     node.dispatchEvent(new Event('input', {{ bubbles: true }})); 
                                     node.dispatchEvent(new Event('change', {{ bubbles: true }})); 
@@ -351,6 +373,12 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
                                 # 1. वज़न इंजेक्ट करें
                                 # 🚀 PURE GHOST ENTRY (Anti-Bot Bypass)
                                 js_inject = f"""node => {{
+                                    // Global Validations Bypass
+                                    window.isScaleConnected = true;
+                                    window.isMachineVerified = true;
+                                    window.validateAllScannedInputs = function() {{ return true; }};
+                                    window.isReadingAuthentic = function() {{ return true; }};
+
                                     let nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
                                     let wasReadonly = node.hasAttribute('readonly');
                                     let wasDisabled = node.hasAttribute('disabled');
@@ -359,6 +387,11 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
                                     if(wasDisabled) node.removeAttribute('disabled');
                                     
                                     nativeSetter.call(node, '{weight}');
+
+                                    // 🚀 THE MAGIC: WeakMap Memory Update
+                                    if (typeof verifiedMachineReadings !== 'undefined') {{
+                                        verifiedMachineReadings.set(node, '{weight}');
+                                    }}
                                     
                                     node.dispatchEvent(new Event('input', {{ bubbles: true }})); 
                                     node.dispatchEvent(new Event('change', {{ bubbles: true }})); 
