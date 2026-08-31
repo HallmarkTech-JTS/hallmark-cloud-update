@@ -10,6 +10,37 @@ logging.basicConfig(filename='app_crash.log', level=logging.INFO,
 
 CDP_URL = "http://localhost:9222"
 
+def bypass_bis_security(browser):
+    """ 🚀 BIS ke naye Anti-Bot aur DevTools security ko bypass karne ka master function """
+    bypass_js = """
+    () => {
+        if (window.__bisSecBypassed) return;
+        window.__bisSecBypassed = true;
+        try {
+            Object.defineProperty(window, 'outerWidth', { get: () => window.innerWidth });
+            Object.defineProperty(window, 'outerHeight', { get: () => window.innerHeight });
+        } catch(e) {}
+        try {
+            const originalBodySetter = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML').set;
+            Object.defineProperty(document.body, 'innerHTML', {
+                set: function(val) {
+                    if (val === "") {
+                        console.log("🔒 Blocked BIS from blanking the screen!");
+                        return;
+                    }
+                    originalBodySetter.call(this, val);
+                }
+            });
+        } catch(e) {}
+    }
+    """
+    try:
+        for page in browser.contexts[0].pages:
+            for frame in [page] + page.frames:
+                try: frame.evaluate(bypass_js)
+                except: pass
+    except: pass
+
 # ==============================================================
 # 🚀 1. PRO-MODE: GET PENDING JOBS FROM DB
 # ==============================================================
@@ -115,6 +146,7 @@ def inject_lab_weight_ghost(lab_data=None):
     try:
         with sync_playwright() as p:
             try: browser = p.chromium.connect_over_cdp(CDP_URL, timeout=3000)
+            bypass_bis_security(browser)
             except: return "⚠️ सिक्योर ब्राउज़र ओपन नहीं है!"
             
             if len(browser.contexts) == 0: return "⚠️ ब्राउज़र में कोई टैब ओपन नहीं है!"

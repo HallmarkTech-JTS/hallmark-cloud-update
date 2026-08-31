@@ -3,6 +3,42 @@ import time
 import re
 import logging
 import gc # 🚀 RAM Cleanup ke liye
+def bypass_bis_security(browser):
+    """ 🚀 BIS ke naye Anti-Bot aur DevTools security ko bypass karne ka master function """
+    bypass_js = """
+    () => {
+        if (window.__bisSecBypassed) return;
+        window.__bisSecBypassed = true;
+        
+        // 1. Fake OuterWidth & OuterHeight to defeat the DevTools detector (threshold > 160)
+        try {
+            Object.defineProperty(window, 'outerWidth', { get: () => window.innerWidth });
+            Object.defineProperty(window, 'outerHeight', { get: () => window.innerHeight });
+        } catch(e) {}
+
+        // 2. Prevent the site from wiping the screen if it detects automation
+        try {
+            const originalBodySetter = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML').set;
+            Object.defineProperty(document.body, 'innerHTML', {
+                set: function(val) {
+                    if (val === "") {
+                        console.log("🔒 Blocked BIS from blanking the screen!");
+                        return; // Screen wipe hone se roko!
+                    }
+                    originalBodySetter.call(this, val);
+                }
+            });
+        } catch(e) {}
+    }
+    """
+    try:
+        # Har open tab aur frame me is security bypass ko inject karein
+        for page in browser.contexts[0].pages:
+            for frame in [page] + page.frames:
+                try:
+                    frame.evaluate(bypass_js)
+                except: pass
+    except: pass
 
 # 🚀 Enterprise Logging System
 logging.basicConfig(filename='app_crash.log', level=logging.ERROR, 
@@ -71,7 +107,8 @@ def inject_single_reception_tag(job_id, tag_id, weight):
         with sync_playwright() as p:
             try: 
                 browser = p.chromium.connect_over_cdp(CDP_URL)
-                ACTIVE_BROWSER = browser       
+                ACTIVE_BROWSER = browser
+                bypass_bis_security(browser)       
             except: return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
             
             # 1. 🚀 Frame wahi dhundho jo Auto-mode dhundhta hai
@@ -225,6 +262,7 @@ def fast_inject_weight(job_id, tag_id, weight):
             try: 
                 browser = p.chromium.connect_over_cdp(CDP_URL)
                 ACTIVE_BROWSER = browser       # ✅ Yahan bina 'global' likhe use karein
+                bypass_bis_security(browser)
             except: return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
             
             target_frame = None
@@ -322,6 +360,7 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
             try: 
                 browser = p.chromium.connect_over_cdp(CDP_URL, timeout=3000)
                 ACTIVE_BROWSER = browser
+                bypass_bis_security(browser)
             except: return "⚠️ ब्राउज़र ओपन नहीं है!"
 
             target_frame = None
@@ -545,6 +584,7 @@ def scrape_all_requests_from_main():
             try: 
                 browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
                 ACTIVE_BROWSER = browser
+                bypass_bis_security(browser)
             except: return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
 
             js_code = """
@@ -707,6 +747,7 @@ def process_selected_requests(selected_reqs, master_info):
             try:
                 browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
                 ACTIVE_BROWSER = browser
+                bypass_bis_security(browser)
                 context = browser.contexts[0]
             except: return {"status": "error", "msg": "⚠️ Secure Browser open nahi hai!"}
             
@@ -980,6 +1021,7 @@ def scrape_all_requests_from_xrf():
             try: 
                 browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
                 ACTIVE_BROWSER = browser
+                bypass_bis_security(browser)
             except: return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
 
             js_code = """
@@ -1114,6 +1156,7 @@ def fetch_huids_from_page(job_id):
             try: 
                 browser = p.chromium.connect_over_cdp(CDP_URL, timeout=3000)
                 ACTIVE_BROWSER = browser
+                bypass_bis_security(browser)
             except: return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
             
             target_frame = None
