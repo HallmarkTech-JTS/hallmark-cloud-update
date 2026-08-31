@@ -193,10 +193,6 @@ def inject_lab_weight_ghost(lab_data=None):
             # 🌟 MASTER WEIGHING MACHINE SIMULATOR 🌟
             # ==============================================================
             def insert_weight_like_machine(locator_obj, weight_val):
-                """
-                Ultimate Bypass: Yeh React/Angular ke value tracker aur 
-                events ko direct trigger karega taaki 'Unauthorized input' ka popup na aaye.
-                """
                 locator_obj.evaluate(f"""node => {{
                     let nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
                     
@@ -206,15 +202,15 @@ def inject_lab_weight_ghost(lab_data=None):
                     if(wasReadonly) node.removeAttribute('readonly');
                     if(wasDisabled) node.removeAttribute('disabled');
                     
-                    # 1. Direct Native Value Set
+                    // Direct Native Value Set
                     nativeSetter.call(node, '{weight_val}');
                     
-                    # 2. Framework Value Tracker Bypass (React/Angular catch nahi kar payega)
+                    // Framework Value Tracker Bypass
                     if (node._valueTracker) {{
                         node._valueTracker.setValue('{weight_val}');
                     }}
                     
-                    # 3. Trusted Events Dispatch
+                    // Trusted Events Dispatch
                     node.dispatchEvent(new Event('input', {{ bubbles: true, cancelable: true, isTrusted: true }}));
                     node.dispatchEvent(new Event('change', {{ bubbles: true, cancelable: true, isTrusted: true }}));
                     node.dispatchEvent(new Event('blur', {{ bubbles: true }}));
@@ -222,6 +218,7 @@ def inject_lab_weight_ghost(lab_data=None):
                     if(wasReadonly) node.setAttribute('readonly', 'true');
                     if(wasDisabled) node.setAttribute('disabled', 'true');
                 }}""")
+            # ==============================================================
             # ==============================================================
 
             try:
@@ -271,18 +268,26 @@ def inject_lab_weight_ghost(lab_data=None):
             # ---------------------------------------------------------
             filled_count = 0
             global_phase = 1
-            first_strip_name = list(lab_data.keys())[0] 
-            first_row = bis_page.locator("tr").filter(has=bis_page.get_by_text(first_strip_name, exact=True))
             
-            if first_row.count() > 0:
-                m1_box = first_row.locator("input").nth(0)
-                m1_target = str(lab_data[first_strip_name].get("M1", "")).strip()
-                if str(m1_box.evaluate("node => node.value")).strip() == m1_target and m1_target != "": 
-                    global_phase = 2
+            # 🚀 SAFETY FIX: Agar keys match na karein toh crash hone ki jagah safe default lo
+            try:
+                first_strip_name = list(lab_data.keys())[0] 
+                first_row = bis_page.locator("tr").filter(has=bis_page.get_by_text(first_strip_name, exact=True))
+                
+                if first_row.count() > 0:
+                    m1_box = first_row.locator("input").nth(0)
+                    m1_target = str(lab_data[first_strip_name].get("M1", "")).strip()
+                    if str(m1_box.evaluate("node => node.value")).strip() == m1_target and m1_target != "": 
+                        global_phase = 2
+            except Exception as e:
+                print(f"⚠️ Phase detection skipped, defaulting to Phase 1: {e}")
 
             for strip_name, weights in lab_data.items():
                 try:
-                    row = bis_page.locator("tr").filter(has=bis_page.get_by_text(strip_name, exact=True))
+                    # 🚀 ROBUST ROW FINDER: Strip 1, Strip 2, C1, C2 ko flexible tarike se dhundega
+                    row = bis_page.locator("tr").filter(has_text=strip_name)
+                    if row.count() == 0:
+                        row = bis_page.locator("tr").filter(has=bis_page.get_by_text(strip_name, exact=False))
                     if row.count() > 0:
                         inputs = row.locator("input")
                         
