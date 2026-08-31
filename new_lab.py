@@ -145,9 +145,11 @@ def inject_lab_weight_ghost(lab_data=None):
     
     try:
         with sync_playwright() as p:
-            try: browser = p.chromium.connect_over_cdp(CDP_URL, timeout=3000)
-            bypass_bis_security(browser)
-            except: return "⚠️ सिक्योर ब्राउज़र ओपन नहीं है!"
+            try: 
+                browser = p.chromium.connect_over_cdp(CDP_URL, timeout=3000)
+                bypass_bis_security(browser)
+            except: 
+                return "⚠️ सिक्योर ब्राउज़र ओपन नहीं है!"
             
             if len(browser.contexts) == 0: return "⚠️ ब्राउज़र में कोई टैब ओपन नहीं है!"
 
