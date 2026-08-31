@@ -252,7 +252,7 @@ def inject_single_reception_tag(job_id, tag_id, weight):
 # 2. FAST DROPDOWN INJECTION 
 # ==============================================================
 def fast_inject_weight(job_id, tag_id, weight):
-    global CANCEL_FETCH, ACTIVE_BROWSER        # ✅ Ise bilkul upar daal dein
+    global CANCEL_FETCH, ACTIVE_BROWSER
     
     tag_id, weight = str(tag_id).strip(), str(weight).strip()
     print(f"🚀 Fast Dropdown Inject: Tag: {tag_id} | Wt: {weight}g | Job: {job_id}")
@@ -261,9 +261,10 @@ def fast_inject_weight(job_id, tag_id, weight):
         with sync_playwright() as p:
             try: 
                 browser = p.chromium.connect_over_cdp(CDP_URL)
-                ACTIVE_BROWSER = browser       # ✅ Yahan bina 'global' likhe use karein
+                ACTIVE_BROWSER = browser
                 bypass_bis_security(browser)
-            except: return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
+            except: 
+                return {"status": "error", "msg": "⚠️ Secure BIS Browser open nahi hai!"}
             
             target_frame = None
             for page in browser.contexts[0].pages:
@@ -283,58 +284,60 @@ def fast_inject_weight(job_id, tag_id, weight):
                 except: pass
                 return {"status": "error", "msg": f"⚠️ Tag '{tag_id}' list me nahi mila."}
 
-            # 🚀 NAYI LINE (Strict Match: Sirf Column 2 ya 3 me Tag ID dhundhega)
-            # 🚀 NAYA FIX: S.No (1,2,3) aur Tag ID mix na ho, isliye strictly .tagIdCls use karenge
             row = target_frame.locator("tr").filter(has=target_frame.locator(".tagIdCls").get_by_text(tag_id, exact=True))
             if row.count() == 0: 
                 row = target_frame.locator("tr").filter(has=target_frame.locator("td:nth-child(2)").get_by_text(tag_id, exact=True))
             
             if row.count() > 0:
-                weight_input = row.first.locator("input.weightCls, input.scan-input, input[name='articlWeight'], input:not([type='hidden']):not([type='checkbox'])").first
+                weight_input = row.first.locator("input.weightCls, input.scan-input, input:not([type='hidden']):not([type='checkbox'])").first
+                
                 if weight_input.count() > 0:
-                    # 🚀 PURE GHOST ENTRY (Anti-Bot Bypass)
-                                js_inject = f"""node => {{
-                                    // Global Validations Bypass
-                                    window.isScaleConnected = true;
-                                    window.isMachineVerified = true;
-                                    window.validateAllScannedInputs = function() {{ return true; }};
-                                    window.isReadingAuthentic = function() {{ return true; }};
+                    js_inject = f"""node => {{
+                        window.isScaleConnected = true;
+                        window.isMachineVerified = true;
+                        window.validateAllScannedInputs = function() {{ return true; }};
+                        window.isReadingAuthentic = function() {{ return true; }};
 
-                                    let nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                                    let wasReadonly = node.hasAttribute('readonly');
-                                    let wasDisabled = node.hasAttribute('disabled');
-                                    
-                                    if(wasReadonly) node.removeAttribute('readonly');
-                                    if(wasDisabled) node.removeAttribute('disabled');
-                                    
-                                    nativeSetter.call(node, '{weight}');
+                        let nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                        let wasReadonly = node.hasAttribute('readonly');
+                        let wasDisabled = node.hasAttribute('disabled');
+                        
+                        if(wasReadonly) node.removeAttribute('readonly');
+                        if(wasDisabled) node.removeAttribute('disabled');
+                        
+                        nativeSetter.call(node, '{weight}');
 
-                                    // 🚀 THE MAGIC: WeakMap Memory Update
-                                    if (typeof verifiedMachineReadings !== 'undefined') {{
-                                        verifiedMachineReadings.set(node, '{weight}');
-                                    }}
-                                    
-                                    node.dispatchEvent(new Event('input', {{ bubbles: true }})); 
-                                    node.dispatchEvent(new Event('change', {{ bubbles: true }})); 
-                                    node.dispatchEvent(new Event('blur', {{ bubbles: true }})); 
-                                    
-                                    if(wasReadonly) node.setAttribute('readonly', 'true');
-                                    if(wasDisabled) node.setAttribute('disabled', 'true');
-                                }}"""
-                                weight_input.evaluate(js_inject)
+                        if (typeof verifiedMachineReadings !== 'undefined') {{
+                            verifiedMachineReadings.set(node, '{weight}');
+                        }}
+                        
+                        node.dispatchEvent(new Event('input', {{ bubbles: true }})); 
+                        node.dispatchEvent(new Event('change', {{ bubbles: true }})); 
+                        node.dispatchEvent(new Event('blur', {{ bubbles: true }})); 
+                        
+                        if(wasReadonly) node.setAttribute('readonly', 'true');
+                        if(wasDisabled) node.setAttribute('disabled', 'true');
+                    }}"""
+                    weight_input.evaluate(js_inject)
                     
                     save_btn = row.first.locator("text='Save'").first
                     if save_btn.is_visible():
                         main_page = target_frame if hasattr(target_frame, 'once') else target_frame.page
                         main_page.once("dialog", lambda dialog: dialog.accept())
-                        save_btn.evaluate("node => node.click()") # JS Click lagaya
+                        save_btn.evaluate("node => node.click()")
                         time.sleep(1)
                         
-                    try: browser.disconnect()
-                    except: pass
+                    try: 
+                        browser.disconnect()
+                    except: 
+                        pass
+                        
                     return {"status": "success", "msg": f"✅ Tag '{tag_id}' Saved ({weight}g)"}
-                else: return {"status": "error", "msg": "⚠️ Input box nahi mila!"}
-            else: return {"status": "error", "msg": f"⚠️ Tag '{tag_id}' list me nahi mila."}
+                else: 
+                    return {"status": "error", "msg": "⚠️ Input box nahi mila!"}
+            else: 
+                return {"status": "error", "msg": f"⚠️ Tag '{tag_id}' list me nahi mila."}
+                
     except Exception as e:
         logging.error(f"Fast Inject Error: {e}", exc_info=True)
         return {"status": "error", "msg": f"⚠️ Error: {str(e)}"}
