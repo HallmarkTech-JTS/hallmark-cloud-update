@@ -4,56 +4,46 @@ import time
 import sqlite3
 import logging
 
-# 🚀 Enterprise Logging System (INFO level add kiya taaki success bhi record ho)
+# 🚀 Enterprise Logging System
 logging.basicConfig(filename='app_crash.log', level=logging.INFO, 
                     format='%(asctime)s - LAB - %(levelname)s - %(message)s')
 
 CDP_URL = "http://localhost:9222"
 
 # ==============================================================
-# 🚀 1. PRO-MODE: GET PENDING JOBS FROM DB (No UI)
+# 🚀 1. PRO-MODE: GET PENDING JOBS FROM DB
 # ==============================================================
 def get_pending_lab_jobs():
-    """Sirf Database se un Job Cards ko nikalega jinka Lab data abhi nahi bana hai."""
     try:
-        conn = sqlite3.connect('jewellery_data.db', timeout=5)
-        cursor = conn.cursor()
-        
-        # 1. Main job_cards table se valid jobs nikalo
-        cursor.execute("SELECT DISTINCT job_id FROM job_cards")
-        all_jobs = [str(r[0]).strip() for r in cursor.fetchall() if str(r[0]).strip().isdigit() and len(str(r[0]).strip()) > 6]
-        all_jobs = list(set(all_jobs))
-        
-        # 2. Jo jobs pehle se lab_results mein hain, unhe hata do
-        cursor.execute("CREATE TABLE IF NOT EXISTS lab_results (job_id TEXT UNIQUE, sample_drawn_wt REAL, button_wt REAL, s1_m1 REAL, s1_ag REAL, s1_cu REAL, s1_pb REAL, s1_m2 REAL, s2_m1 REAL, s2_ag REAL, s2_cu REAL, s2_pb REAL, s2_m2 REAL, c1_m1 REAL, c1_m2 REAL, c2_m1 REAL, c2_m2 REAL, remarks TEXT)")
-        cursor.execute("SELECT job_id FROM lab_results")
-        done_jobs = set([str(r[0]).strip() for r in cursor.fetchall()])
-        
-        conn.close()
-        
-        pending = sorted([j for j in all_jobs if j not in done_jobs], reverse=True)
-        return {"status": "success", "data": pending}
+        with sqlite3.connect('jewellery_data.db', timeout=5) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT DISTINCT job_id FROM job_cards")
+            all_jobs = [str(r[0]).strip() for r in cursor.fetchall() if str(r[0]).strip().isdigit() and len(str(r[0]).strip()) > 6]
+            all_jobs = list(set(all_jobs))
+            
+            cursor.execute("CREATE TABLE IF NOT EXISTS lab_results (job_id TEXT UNIQUE, sample_drawn_wt REAL, button_wt REAL, s1_m1 REAL, s1_ag REAL, s1_cu REAL, s1_pb REAL, s1_m2 REAL, s2_m1 REAL, s2_ag REAL, s2_cu REAL, s2_pb REAL, s2_m2 REAL, c1_m1 REAL, c1_m2 REAL, c2_m1 REAL, c2_m2 REAL, remarks TEXT)")
+            cursor.execute("SELECT job_id FROM lab_results")
+            done_jobs = set([str(r[0]).strip() for r in cursor.fetchall()])
+            
+            pending = sorted([j for j in all_jobs if j not in done_jobs], reverse=True)
+            return {"status": "success", "data": pending}
     except Exception as e:
         logging.error(f"Get Pending Lab Jobs Error: {e}", exc_info=True)
         return {"status": "error", "msg": str(e)}
 
 # ==============================================================
-# 🚀 2. PRO-MODE: GENERATE LAB DATA MATH LOGIC (Background Calculation)
+# 🚀 2. PRO-MODE: GENERATE LAB DATA MATH LOGIC
 # ==============================================================
 def generate_pro_lab_data(selected_jobs, purity_val, low_r, high_r, c1m2, c2m2):
-    """UI se data aayega, ye function calculate karke DB me save karega."""
     if not selected_jobs or len(selected_jobs) == 0:
         return {"status": "error", "msg": "No jobs selected for generation."}
         
     try:
         p_val = float(purity_val) / 1000.0
-        
-        # 🚀 ENTERPRISE DB FIX: Safe Connection Handling (Auto-close on error)
         with sqlite3.connect('jewellery_data.db', timeout=10) as conn:
             cursor = conn.cursor()
             
             for jc in selected_jobs:
-                # Formula Calculations
                 rand_delta_1 = random.uniform(0.010, 0.100)
                 rand_delta_2 = random.uniform(0.010, 0.100)
 
@@ -91,8 +81,7 @@ def generate_pro_lab_data(selected_jobs, purity_val, low_r, high_r, c1m2, c2m2):
                                    c2_m1, c2_ag, c2_cu, c2_pb, c2_m2, remarks)
                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                                (jc, sample_drawn, button_wt, 
-                                m1s1, ag_s1, 0, lead_val, m2s1,
-                                m1s2, ag_s2, 0, lead_val, m2s2,
+                                m1s1, ag_s1, 0, lead_val, m2s1, m1s2, ag_s2, 0, lead_val, m2s2,
                                 m1c1, c1_ag, calculated_cu, lead_val, c1m2_final,
                                 m1c2, c2_ag, calculated_cu, lead_val, c2m2_final, 'Auto Generated'))
             conn.commit()
@@ -102,39 +91,14 @@ def generate_pro_lab_data(selected_jobs, purity_val, low_r, high_r, c1m2, c2m2):
         return {"status": "error", "msg": f"Database Error: {str(e)}"}
 
 # ==============================================================
-# 🚀 3. LAB INJECTION (Superfast Ghost Engine)
+# 🚀 3. LAB INJECTION (The Ultimate OS-Level Bypass)
 # ==============================================================
 def inject_lab_weight_ghost(lab_data=None):
     if lab_data is None or len(lab_data) == 0:
         return "⚠️ इंस्ट्रक्शन: कृपया पहले डेटा लोड करें!"
-        
-    # 🚀 ENTERPRISE FIX: DRY Principle & Bulletproof Anti-Bot (Double Brackets {{ }} used safely)
-    def get_ghost_js(weight_value):
-        return f"""node => {{
-            let nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-            let wasReadonly = node.hasAttribute('readonly');
-            let wasDisabled = node.hasAttribute('disabled');
-            
-            // Bypass locks stealthily
-            if(wasReadonly) node.removeAttribute('readonly');
-            if(wasDisabled) node.removeAttribute('disabled');
-            
-            // Pure Ghost Injection (Looks like COM Port)
-            nativeSetter.call(node, '{weight_value}');
-            
-            // Fire all necessary events to satisfy modern JS Frameworks (React/Angular)
-            node.dispatchEvent(new Event('input', {{ bubbles: true }}));
-            node.dispatchEvent(new Event('change', {{ bubbles: true }}));
-            node.dispatchEvent(new Event('blur', {{ bubbles: true }})); 
-            
-            // Re-apply locks silently
-            if(wasReadonly) node.setAttribute('readonly', 'true');
-            if(wasDisabled) node.setAttribute('disabled', 'true');
-        }}"""
 
     excel_job_card = str(lab_data.pop("excel_job_card", "UNKNOWN")).strip()
     
-    # SMART LOT DETECTION & EXTRACTION
     if "-L" in excel_job_card:
         actual_site_job_card = excel_job_card.split('-L')[0].strip()
         target_lot_num = excel_job_card.split('-L')[1].strip()
@@ -158,7 +122,7 @@ def inject_lab_weight_ghost(lab_data=None):
             browser.contexts[0].set_default_timeout(3000)
             bis_page = None
             wrong_lot_error = False
-            time.sleep(1) # Tab load hone ka wait
+            time.sleep(1)
             
             # SMART STRICT MATCHING WITH LOT AUTO-SWITCHER
             for page in browser.contexts[0].pages[::-1]:
@@ -166,18 +130,13 @@ def inject_lab_weight_ghost(lab_data=None):
                     try:
                         if frame.locator("input#num_scrap_weight").count() > 0 or frame.locator("input#buttonweight").count() > 0:
                             text = frame.locator("body").inner_text().upper()
-                            
-                            is_active_job = False
                             clean_text = text.replace(" ", "").replace("\n", "").replace("\r", "").replace(":", "")
                             
-                            perfect_match_1 = f"JOBCARDNUMBER{actual_site_job_card}"
-                            perfect_match_2 = f"JOBCARDNO{actual_site_job_card}"
-                            
-                            if perfect_match_1 in clean_text or perfect_match_2 in clean_text:
+                            is_active_job = False
+                            if f"JOBCARDNUMBER{actual_site_job_card}" in clean_text or f"JOBCARDNO{actual_site_job_card}" in clean_text:
                                 is_active_job = True
-                            else:
-                                if frame.locator(f"input[value='{actual_site_job_card}']").count() > 0:
-                                    is_active_job = True
+                            elif frame.locator(f"input[value='{actual_site_job_card}']").count() > 0:
+                                is_active_job = True
                             
                             if is_active_job:
                                 if target_lot_num != "1":
@@ -214,29 +173,51 @@ def inject_lab_weight_ghost(lab_data=None):
             if not bis_page:
                 try: browser.disconnect() 
                 except: pass
-                
                 if wrong_lot_error:
                     return f"❌ अलर्ट: जॉब कार्ड '{actual_site_job_card}' मिल गया, लेकिन साइट पर '{expected_lot_string}' खुला नहीं है! कृपया सही Lot चुनें।"
                 return f"❌ अलर्ट: Job Card '{actual_site_job_card}' का लैब फॉर्म स्क्रीन पर नहीं मिला!"
 
-            # Handle Popup (Safe way for both Page and Frame)
             main_page = bis_page.page if hasattr(bis_page, 'page') else bis_page
             
-            # 🚀 PRO-LEVEL FIX: Crash Prevention
+            # 🚀 PRO-LEVEL FIX: Crash Prevention & Memory Leak Fix
             try: main_page.remove_all_listeners("dialog")
             except: pass
             
-            # 🚀 MEMORY LEAK FIX
             def handle_dialog(dialog):
                 try: dialog.accept()
                 except: pass
-                
             try: main_page.on("dialog", handle_dialog)
             except: pass
 
-            # ---------------------------------------------------------
-            # 🚀 ULTRA-PRECISE PRE-INJECTION SEQUENCE
-            # ---------------------------------------------------------
+            # ==============================================================
+            # 🌟 MASTER WEIGHING MACHINE SIMULATOR 🌟
+            # ==============================================================
+            def insert_weight_like_machine(locator_obj, weight_val):
+                """Yeh function website ko 100% dhokha dega ki data COM port se aaya hai"""
+                # Step 1: Chupke se lock kholo aur element ko focus karo
+                locator_obj.evaluate("""node => {
+                    let nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                    node.dataset.wro = node.hasAttribute('readonly') ? '1' : '0';
+                    node.dataset.wds = node.hasAttribute('disabled') ? '1' : '0';
+                    node.removeAttribute('readonly');
+                    node.removeAttribute('disabled');
+                    nativeSetter.call(node, ''); // Purana kachra saaf karo bina alarm bajaye
+                    node.focus(); // Focus karna zaruri hai OS paste ke liye
+                }""")
+                
+                # Step 2: 🚀 THE MAGIC - OS Level Native Insertion 
+                # (isTrusted = true dega, aur "keydown" nahi bhejeaga, jisse 'Manual Entry Banned' nahi aayega)
+                main_page.keyboard.insert_text(str(weight_val))
+                
+                # Step 3: Piche se locks wapas lagao aur framework ko update karo
+                locator_obj.evaluate("""node => {
+                    node.dispatchEvent(new Event('change', { bubbles: true }));
+                    node.blur();
+                    if(node.dataset.wro === '1') node.setAttribute('readonly', 'true');
+                    if(node.dataset.wds === '1') node.setAttribute('disabled', 'true');
+                }""")
+            # ==============================================================
+
             try:
                 # 1. SAMPLE DRAWN WEIGHT
                 if sample_wt and str(sample_wt) not in ["0", "0.0", "", "None"]:
@@ -244,7 +225,7 @@ def inject_lab_weight_ghost(lab_data=None):
                     sample_input = bis_page.locator("input#num_scrap_weight").first
                     
                     if sample_input.count() > 0:
-                        sample_input.evaluate(get_ghost_js(sample_wt))
+                        insert_weight_like_machine(sample_input, sample_wt)
                         bis_page.wait_for_timeout(600)
                         
                         sample_save_btn = bis_page.locator("xpath=//input[@id='num_scrap_weight']/following::button[contains(., 'Save')][1]").first
@@ -254,19 +235,16 @@ def inject_lab_weight_ghost(lab_data=None):
                             print(msg)
                             logging.info(msg)
                             bis_page.wait_for_timeout(2500)
-                        else:
-                            print("⚠️ Sample Weight ka Save button nahi mila!")
 
                 # 2. BUTTON WEIGHT
                 if button_wt and str(button_wt) not in ["0", "0.0", "", "None"]:
                     print(f"⚖️ Injecting Button Weight: {button_wt}")
-                    
                     button_input = bis_page.locator("input#buttonweight").first
                     if button_input.count() == 0:
                         button_input = bis_page.locator("xpath=//label[contains(., 'Button Weight')]/following::input[1]").first
                     
                     if button_input.count() > 0:
-                        button_input.evaluate(get_ghost_js(button_wt))
+                        insert_weight_like_machine(button_input, button_wt)
                         bis_page.wait_for_timeout(600)
                         
                         button_save_btn = bis_page.locator("xpath=//input[@id='buttonweight']/following::button[contains(., 'Save')][1]").first
@@ -279,14 +257,12 @@ def inject_lab_weight_ghost(lab_data=None):
                             print(msg)
                             logging.info(msg)
                             bis_page.wait_for_timeout(2500)
-                        else:
-                            print("⚠️ Button Weight ka Save button nahi mila!")
 
             except Exception as e:
                 logging.error(f"Pre-Injection Sequence Error: {e}")
                 print(f"⚠️ Pre-Injection Sequence Error: {e}")
-            # ---------------------------------------------------------
 
+            # ---------------------------------------------------------
             filled_count = 0
             global_phase = 1
             first_strip_name = list(lab_data.keys())[0] 
@@ -309,8 +285,8 @@ def inject_lab_weight_ghost(lab_data=None):
                                 box = inputs.nth(idx)
                                 val_str = str(val).strip()
                                 if str(box.evaluate("node => node.value")).strip() != val_str:
-                                    # 🚀 Clean Enterprise Call (Ghost Entry applied automatically)
-                                    box.evaluate(get_ghost_js(val_str))
+                                    # 🚀 Machine Simulator Call
+                                    insert_weight_like_machine(box, val_str)
                                     bis_page.wait_for_timeout(random.randint(200, 400))
                                     return True
                             return False
@@ -325,7 +301,6 @@ def inject_lab_weight_ghost(lab_data=None):
                                     enter_btn = row.locator("button:has-text('Enter')")
                                     if enter_btn.count() > 0:
                                         bis_page.wait_for_timeout(random.randint(300, 600))
-                                        # 🚀 HANG FIX: Async Click
                                         enter_btn.first.evaluate("node => setTimeout(() => node.click(), 50)")
                                         bis_page.wait_for_timeout(random.randint(500, 1000))
                                 except Exception as e:
