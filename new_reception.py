@@ -551,44 +551,85 @@ def scrape_all_requests_from_main():
             () => {
                 let results = {};
                 let hasData = false;
-                let tables = document.querySelectorAll('table');
                 
-                for (let t of tables) {
-                    let headers = Array.from(t.querySelectorAll('th, thead td')).map(x => x.innerText.trim().toUpperCase());
-                    if (headers.length === 0) {
-                        let firstRow = t.querySelector('tr');
-                        if(firstRow) headers = Array.from(firstRow.querySelectorAll('td')).map(x => x.innerText.trim().toUpperCase());
-                    }
+                // Sirf data wali tables dhundho
+                let rows = document.querySelectorAll('table tbody tr');
+                
+                for (let r of rows) {
+                    // Hidden rows ko ignore karo
+                    if (r.offsetParent === null) continue;
                     
-                    let reqIdx = headers.findIndex(h => h.includes('REQUEST NO') || h.includes('REQ NO') || h.includes('REQUEST'));
-                    let jobIdx = headers.findIndex(h => h.includes('JOB CARD') || h.includes('JOB NO'));
+                    let rowText = r.innerText.toUpperCase();
                     
-                    if (reqIdx === -1) reqIdx = 0; 
-                    if (jobIdx === -1) jobIdx = 2; 
-
-                    let rows = t.querySelectorAll('tbody tr');
-                    for (let r of rows) {
-                        let cells = r.querySelectorAll('td');
-                        if (cells.length > Math.max(reqIdx, jobIdx)) {
-                            let reqText = cells[reqIdx].innerText.trim();
-                            let jobText = cells[jobIdx].innerText.trim();
-                            
-                            if (jobText.includes("No data")) continue;
-
-                            let reqMatch = reqText.match(/\\d+/);
-                            let jobMatch = jobText.match(/\\d+/);
-                            
-                            let req = reqMatch ? reqMatch[0] : "UNKNOWN";
-                            let job = jobMatch ? jobMatch[0] : null;
-                            
-                            if (job) {
-                                if (!results[req]) results[req] = [];
-                                if (!results[req].includes(job)) results[req].push(job);
-                                hasData = true;
+                    // Faltu rows jisme data nahi hai unko skip karo
+                    if (rowText.includes("NO DATA") || rowText.includes("LOADING")) continue;
+                    
+                    let cells = r.querySelectorAll('td');
+                    let req = null;
+                    let job = null;
+                    
+                    // Har ek cell ko check karo patterns ke liye
+                    for (let c of cells) {
+                        let cellText = c.innerText.trim();
+                        
+                        // Request No pattern (usually 9+ digits, starts with 1)
+                        if (/^1\\d{8}$/.test(cellText)) {
+                            req = cellText;
+                        }
+                        // Job Card No pattern (usually 9+ digits, starts with 1, often longer)
+                        else if (/^1\\d{8,}$/.test(cellText)) {
+                            // Request no generally chota hota hai Job no se.
+                            // Agar req pehle se mil gaya hai aur ye naya number hai, toh ye pakka Job Card hai.
+                            if (req !== null && cellText !== req) {
+                                job = cellText;
+                            } 
+                            // Agar abhi tak req nahi mila, aur length exactly 9 hai, toh probably req hai
+                            else if (req === null && cellText.length === 9) {
+                                req = cellText;
+                            }
+                            // Bacha hua job card hai
+                            else {
+                                job = cellText;
                             }
                         }
                     }
+                    
+                    // Agar Regex fail ho jaye toh purana tareeqa fallback ki tarah use karo
+                    if (!req || !job) {
+                        // Table ke headers dhundo
+                        let table = r.closest('table');
+                        let headers = Array.from(table.querySelectorAll('th, thead td')).map(x => x.innerText.trim().toUpperCase().replace(/\\./g, ''));
+                        
+                        let reqIdx = headers.findIndex(h => h.includes('REQUEST NO') || h.includes('REQ NO') || h.includes('REQUEST'));
+                        let jobIdx = headers.findIndex(h => h.includes('JOB CARD') || h.includes('JOB NO'));
+                        
+                        // Default index agar na mile
+                        if (reqIdx === -1) reqIdx = 1; // Aapke HTML me Request No index 1 par hai
+                        if (jobIdx === -1) jobIdx = 3; // Aapke HTML me Job Card No index 3 par hai
+                        
+                        if (cells.length > Math.max(reqIdx, jobIdx)) {
+                            let possibleReq = cells[reqIdx].innerText.trim().match(/\\d+/);
+                            let possibleJob = cells[jobIdx].innerText.trim().match(/\\d+/);
+                            
+                            if(!req && possibleReq) req = possibleReq[0];
+                            if(!job && possibleJob) job = possibleJob[0];
+                        }
+                    }
+
+                    // Agar dono mil gaye hain, toh dictionary me daalo
+                    if (req && job) {
+                        if (!results[req]) results[req] = [];
+                        if (!results[req].includes(job)) results[req].push(job);
+                        hasData = true;
+                    } else if (job) {
+                         // Agar sirf job card mila hai, toh UNKNOWN me daal do
+                         req = "UNKNOWN";
+                         if (!results[req]) results[req] = [];
+                         if (!results[req].includes(job)) results[req].push(job);
+                         hasData = true;
+                    }
                 }
+                
                 return hasData ? results : null;
             }
             """
