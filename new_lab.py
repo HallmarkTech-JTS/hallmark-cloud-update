@@ -91,7 +91,7 @@ def generate_pro_lab_data(selected_jobs, purity_val, low_r, high_r, c1m2, c2m2):
         return {"status": "error", "msg": f"Database Error: {str(e)}"}
 
 # ==============================================================
-# 🚀 3. LAB INJECTION (The Ultimate OS-Level Bypass)
+# 🚀 3. LAB INJECTION (Global JS Interceptor & Override)
 # ==============================================================
 def inject_lab_weight_ghost(lab_data=None):
     if lab_data is None or len(lab_data) == 0:
@@ -190,8 +190,19 @@ def inject_lab_weight_ghost(lab_data=None):
             except: pass
 
             # ==============================================================
-            # 🌟 MASTER WEIGHING MACHINE SIMULATOR 🌟
+            # 🌟 GLOBAL JS OVERRIDE & WEIGHING INTERCEPTOR 🌟
             # ==============================================================
+            try:
+                main_page.evaluate("""() => {
+                    // Website ke validation function ko neutralize karna
+                    window.isScaleConnected = true;
+                    window.isMachineVerified = true;
+                    if(window.validateWeightInput) {
+                        window.validateWeightInput = function() { return true; };
+                    }
+                """)
+            except: pass
+
             def insert_weight_like_machine(locator_obj, weight_val):
                 locator_obj.evaluate(f"""node => {{
                     let nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
@@ -202,15 +213,12 @@ def inject_lab_weight_ghost(lab_data=None):
                     if(wasReadonly) node.removeAttribute('readonly');
                     if(wasDisabled) node.removeAttribute('disabled');
                     
-                    // Direct Native Value Set
                     nativeSetter.call(node, '{weight_val}');
                     
-                    // Framework Value Tracker Bypass
                     if (node._valueTracker) {{
                         node._valueTracker.setValue('{weight_val}');
                     }}
                     
-                    // Trusted Events Dispatch
                     node.dispatchEvent(new Event('input', {{ bubbles: true, cancelable: true, isTrusted: true }}));
                     node.dispatchEvent(new Event('change', {{ bubbles: true, cancelable: true, isTrusted: true }}));
                     node.dispatchEvent(new Event('blur', {{ bubbles: true }}));
@@ -218,7 +226,6 @@ def inject_lab_weight_ghost(lab_data=None):
                     if(wasReadonly) node.setAttribute('readonly', 'true');
                     if(wasDisabled) node.setAttribute('disabled', 'true');
                 }}""")
-            # ==============================================================
             # ==============================================================
 
             try:
@@ -269,7 +276,6 @@ def inject_lab_weight_ghost(lab_data=None):
             filled_count = 0
             global_phase = 1
             
-            # 🚀 SAFETY FIX: Agar keys match na karein toh crash hone ki jagah safe default lo
             try:
                 first_strip_name = list(lab_data.keys())[0] 
                 first_row = bis_page.locator("tr").filter(has=bis_page.get_by_text(first_strip_name, exact=True))
@@ -284,7 +290,6 @@ def inject_lab_weight_ghost(lab_data=None):
 
             for strip_name, weights in lab_data.items():
                 try:
-                    # 🚀 ROBUST ROW FINDER: Strip 1, Strip 2, C1, C2 ko flexible tarike se dhundega
                     row = bis_page.locator("tr").filter(has_text=strip_name)
                     if row.count() == 0:
                         row = bis_page.locator("tr").filter(has=bis_page.get_by_text(strip_name, exact=False))
@@ -296,7 +301,6 @@ def inject_lab_weight_ghost(lab_data=None):
                                 box = inputs.nth(idx)
                                 val_str = str(val).strip()
                                 if str(box.evaluate("node => node.value")).strip() != val_str:
-                                    # 🚀 Machine Simulator Call
                                     insert_weight_like_machine(box, val_str)
                                     bis_page.wait_for_timeout(random.randint(200, 400))
                                     return True
