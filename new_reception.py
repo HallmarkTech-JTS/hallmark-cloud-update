@@ -377,7 +377,7 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
     try:
         with sync_playwright() as p:
             try: 
-                browser = p.chromium.connect_over_cdp(CDP_URL, timeout=3000)
+                browser = p.chromium.connect_over_cdp(CDP_URL, timeout=15000)
                 ACTIVE_BROWSER = browser
                 bypass_bis_security(browser) 
             except: 
@@ -433,7 +433,7 @@ def inject_reception_weight_ghost(job_id, job_data, delay_ms=400):
                     continue
 
                 try: 
-                    target_frame.wait_for_selector("table tbody tr", timeout=4000)
+                    target_frame.wait_for_selector("table tbody tr", timeout=10000)
                 except: 
                     pass
                 
@@ -623,7 +623,7 @@ def extract_id_from_page(browser):
     return None
 
 # ==============================================================
-# 4 & 5. SCRAPE REQUESTS (PERMANENT HEADER LOGIC)
+# 4 & 5. SCRAPE REQUESTS (FIXED: HEADER LOGIC + OVERWRITE ISSUE)
 # ==============================================================
 def scrape_all_requests_from_main():
     global CANCEL_FETCH, ACTIVE_BROWSER
@@ -632,7 +632,8 @@ def scrape_all_requests_from_main():
     try:
         with sync_playwright() as p:
             try: 
-                browser = p.chromium.connect_over_cdp(CDP_URL, timeout=5000)
+                # 🚀 Timeout 5000 se 15000 kiya taaki slow internet par load ho sake
+                browser = p.chromium.connect_over_cdp(CDP_URL, timeout=15000)
                 ACTIVE_BROWSER = browser
                 bypass_bis_security(browser)
             except: 
@@ -655,41 +656,35 @@ def scrape_all_requests_from_main():
                     let req = null;
                     let job = null;
                     
-                    for (let c of cells) {
-                        let cellText = c.innerText.trim();
-                        
-                        if (/^1\\d{8}$/.test(cellText)) {
-                            req = cellText;
-                        }
-                        else if (/^1\\d{8,}$/.test(cellText)) {
-                            if (req !== null && cellText !== req) {
-                                job = cellText;
-                            } 
-                            else if (req === null && cellText.length === 9) {
-                                req = cellText;
-                            }
-                            else {
-                                job = cellText;
-                            }
-                        }
-                    }
-                    
-                    if (!req || !job) {
-                        let table = r.closest('table');
+                    // 🚀 1. PEHLE HEADER CHECK KAREGA (Isse Request aur Job Card aapas me mix nahi honge)
+                    let table = r.closest('table');
+                    if (table) {
                         let headers = Array.from(table.querySelectorAll('th, thead td')).map(x => x.innerText.trim().toUpperCase().replace(/\\./g, ''));
-                        
                         let reqIdx = headers.findIndex(h => h.includes('REQUEST NO') || h.includes('REQ NO') || h.includes('REQUEST'));
                         let jobIdx = headers.findIndex(h => h.includes('JOB CARD') || h.includes('JOB NO'));
                         
-                        if (reqIdx === -1) reqIdx = 1; 
-                        if (jobIdx === -1) jobIdx = 3; 
-                        
-                        if (cells.length > Math.max(reqIdx, jobIdx)) {
+                        if (reqIdx !== -1 && jobIdx !== -1 && cells.length > Math.max(reqIdx, jobIdx)) {
                             let possibleReq = cells[reqIdx].innerText.trim().match(/\\d+/);
                             let possibleJob = cells[jobIdx].innerText.trim().match(/\\d+/);
-                            
-                            if(!req && possibleReq) req = possibleReq[0];
-                            if(!job && possibleJob) job = possibleJob[0];
+                            if (possibleReq) req = String(possibleReq[0]).trim();
+                            if (possibleJob) job = String(possibleJob[0]).trim();
+                        }
+                    }
+
+                    // 🚀 2. FALLBACK (Agar Header na mile toh purana logic, lekin overwrite rokne ke lock ke saath)
+                    if (!req || !job) {
+                        req = null; // Reset taaki double print na ho
+                        job = null;
+                        for (let c of cells) {
+                            let match = c.innerText.trim().match(/\\d{8,}/); 
+                            if (match) {
+                                if (!req) {
+                                    req = String(match[0]);
+                                } else if (!job && req !== String(match[0])) {
+                                    // 🚀 Ye lock lagaya hai taaki Request ki jagah wapas Job Card na chhap jaye
+                                    job = String(match[0]);
+                                }
+                            }
                         }
                     }
 
@@ -784,7 +779,6 @@ def scrape_all_requests_from_main():
                 browser.disconnect()
         except: 
             pass
-
 # ==============================================================
 # 5. PROCESS SELECTED REQUESTS (SINGLE TAB MANAGEMENT + BULLETPROOF)
 # ==============================================================
@@ -1253,7 +1247,8 @@ def fetch_huids_from_page(job_id):
     try:
         with sync_playwright() as p:
             try: 
-                browser = p.chromium.connect_over_cdp(CDP_URL, timeout=3000)
+                # 🚀 Timeout 3000 se 15000 kiya taaki network error na aaye
+                browser = p.chromium.connect_over_cdp(CDP_URL, timeout=15000)
                 ACTIVE_BROWSER = browser
                 bypass_bis_security(browser)
             except: 
@@ -1280,29 +1275,47 @@ def fetch_huids_from_page(job_id):
             if not target_frame:
                 return {"status": "error", "msg": "⚠️ Weighing Desk page screen par load nahi hui hai."}
 
+            # 🚀 SMART HEADER DETECTION JAVASCRIPT (Columns idhar-udhar hone par bhi fail nahi hoga)
             js_code = """
             () => {
                 let data = [];
-                let rows = document.querySelectorAll('table tbody tr');
-                for (let r of rows) {
-                    let cells = r.querySelectorAll('td');
-                    if (cells.length >= 6) { 
-                        let tag = cells[1].innerText.trim();
-                        let matCat = cells[2].innerText.trim();
-                        let itemCat = cells[3].innerText.trim();
-                        let huid = cells[4].innerText.trim();
-                        
-                        let weight = cells[5].innerText.trim(); 
-                        let wInput = cells[5].querySelector('input');
-                        if(wInput && wInput.value) weight = wInput.value.trim();
-                        
-                        if (tag && tag !== "" && !tag.toUpperCase().includes("AHC TAG") && !tag.toUpperCase().includes("NO DATA")) {
-                            data.push({
-                                "tag": tag, "category": itemCat,
-                                "purity": matCat, 
-                                "huid": (huid !== "-") ? huid : "",
-                                "weight": (weight !== "-") ? weight : ""
-                            });
+                let tables = document.querySelectorAll('table');
+                for (let t of tables) {
+                    let headers = Array.from(t.querySelectorAll('th, thead td')).map(h => h.innerText.trim().toUpperCase());
+                    
+                    let tagIdx = headers.findIndex(h => h.includes('TAG'));
+                    let matCatIdx = headers.findIndex(h => h.includes('MATERIAL'));
+                    let itemCatIdx = headers.findIndex(h => h.includes('ITEM CATEGORY'));
+                    let huidIdx = headers.findIndex(h => h.includes('HUID'));
+                    let weightIdx = headers.findIndex(h => h.includes('WEIGHT') || h.includes('WT'));
+
+                    if (tagIdx === -1) continue; // Ye sahi table nahi hai
+
+                    let rows = t.querySelectorAll('tbody tr');
+                    for (let r of rows) {
+                        let cells = r.querySelectorAll('td');
+                        if (cells.length > tagIdx) { 
+                            let tag = cells[tagIdx].innerText.trim();
+                            
+                            let matCat = matCatIdx !== -1 && cells.length > matCatIdx ? cells[matCatIdx].innerText.trim() : "-";
+                            let itemCat = itemCatIdx !== -1 && cells.length > itemCatIdx ? cells[itemCatIdx].innerText.trim() : "-";
+                            let huid = huidIdx !== -1 && cells.length > huidIdx ? cells[huidIdx].innerText.trim() : "-";
+                            
+                            let weight = "-";
+                            if (weightIdx !== -1 && cells.length > weightIdx) {
+                                weight = cells[weightIdx].innerText.trim();
+                                let wInput = cells[weightIdx].querySelector('input');
+                                if(wInput && wInput.value) weight = wInput.value.trim();
+                            }
+                            
+                            if (tag && tag !== "" && !tag.toUpperCase().includes("AHC TAG") && !tag.toUpperCase().includes("NO DATA")) {
+                                data.push({
+                                    "tag": tag, "category": itemCat,
+                                    "purity": matCat, 
+                                    "huid": (huid !== "-") ? huid : "",
+                                    "weight": (weight !== "-") ? weight : ""
+                                });
+                            }
                         }
                     }
                 }
