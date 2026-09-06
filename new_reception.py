@@ -768,7 +768,9 @@ def scrape_all_requests_from_main():
 
             if CANCEL_FETCH: 
                 return {"status": "error", "msg": "🛑 Process Stopped."}
-            return {"status": "success", "data": all_data}
+            # 🚀 NAYA CODE: Request aur Job Cards ko series me lane ke liye
+            sorted_data = {req: sorted(jobs) for req, jobs in sorted(all_data.items())}
+            return {"status": "success", "data": sorted_data}
             
     except Exception as e: 
         return {"status": "error", "msg": str(e)}
@@ -1223,7 +1225,9 @@ def scrape_all_requests_from_xrf():
             if CANCEL_FETCH:
                 return {"status": "error", "msg": "🛑 Process Stopped."}
 
-            return {"status": "success", "data": all_data}
+            # 🚀 NAYA CODE: Backup page ke data ko bhi series me lane ke liye
+            sorted_data = {req: sorted(jobs) for req, jobs in sorted(all_data.items())}
+            return {"status": "success", "data": sorted_data}
             
     except Exception as e:
         logging.error(f"XRF Scrape Error: {e}", exc_info=True)
@@ -1372,7 +1376,9 @@ def fetch_huids_from_page(job_id):
             if search_job_id and actual_job_card == search_job_id:
                 tags_info = {item['tag']: {"huid": item['huid'], "weight": item.get('weight', '')} for item in all_data}
                 if len(tags_info) > 0: 
-                    return {"status": "success", "data": tags_info}
+                    # 🚀 NAYA CODE: Tags ko line se lagane ke liye
+                    sorted_tags = dict(sorted(tags_info.items()))
+                    return {"status": "success", "data": sorted_tags}
                 else: 
                     return {"status": "error", "msg": "⚠️ Data khali hai!"}
             else:
